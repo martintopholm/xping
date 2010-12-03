@@ -16,21 +16,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #include <event2/event.h>
 #include <event2/dns.h>
-#include <util-internal.h>
 #include <ncurses.h>
 
 #include "queue.h"
 
-struct event_base *ev_base;
-struct evdns_base *dns;
+#ifndef VERSION
+#define VERSION "xping [compiled " __DATE__ " " __TIME__ "]"
+#endif /* !VERSION */
 
-char outpacket[IP_MAXPACKET];
-int datalen = 56;
-int ident;
+
+/* Option flags */
+int	i_interval = 1000;
+int	A_flag = 0;
+
+/* Global structures */
+struct	event_base *ev_base;
+struct	evdns_base *dns;
+char	outpacket[IP_MAXPACKET];
+int	datalen = 56;
+int	ident;
 
 #define NUM 300
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
@@ -153,7 +162,7 @@ void write_packet(int fd, short what, void *thunk)
 	/* Register missed reply */
 	if (t->npkts > 0 && GETRES(t, -1) == ' ') {
 		SETRES(t, -1, '?');
-		//write(STDOUT_FILENO, "\a", 1);
+		if (A_flag) write(STDOUT_FILENO, "\a", 1);
 	}
 
 	/* Send packet */
@@ -201,7 +210,7 @@ void redraw()
 
 	move(0, 0);
 	clrtoeol();
-	mvprintw(0, col/2 - 37/2, "rping [compiled %s %s]\n", __DATE__, __TIME__);
+	mvprintw(0, col/2 - strlen(VERSION)/2, "%s", VERSION);
 
 	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
@@ -214,16 +223,32 @@ void redraw()
 	}
 
 	y++;
-	mvprintw(y++, 0, "Sent: %d\n", stats->transmitted);
-	mvprintw(y++, 0, "Recv: %d\n", stats->received);
-	mvprintw(y++, 0, "ErrO: %d\n", stats->sendto_err);
-	mvprintw(y++, 0, "ErrI: %d\n", stats->recvfrom_err);
-	mvprintw(y++, 0, "Runt: %d\n", stats->runt);
-	mvprintw(y++, 0, "Othr: %d\n", stats->other);
+	mvprintw(y++, 0, "Sent: %d", stats->transmitted);
+	mvprintw(y++, 0, "Recv: %d", stats->received);
+	mvprintw(y++, 0, "ErrO: %d", stats->sendto_err);
+	mvprintw(y++, 0, "ErrI: %d", stats->recvfrom_err);
+	mvprintw(y++, 0, "Runt: %d", stats->runt);
+	mvprintw(y++, 0, "Othr: %d", stats->other);
+	y++;
+	mvprintw(y++, 0, "Legend: .=echo-reply  ?=no-reply   #=icmp-other"); 
+	mvprintw(y++, 0, "        @=dns-pending !=send-error $=senderror ?");
+
+	
 
 	move(y++, 0);
 
 	refresh();
+}
+
+void usage(const char *whine)
+{
+        if (whine != NULL) {
+                fprintf(stderr, "%s\n", whine);
+        }
+	fprintf(stderr,
+	    "usage: xping [-AVh] [-i interval] host [host [...]]\n"
+	    "\n");
+        exit(EX_USAGE);
 }
 
 int main(int argc, char *argv[])
@@ -231,22 +256,47 @@ int main(int argc, char *argv[])
 	struct timeval tv;
 	struct event *ev;
 	struct target *t;
+	char *end;
 	int salen;
 	int fd;
 	int i;
+	char ch;
 
 	/* Open RAW-socket and drop root-privs */
 	fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	setuid(getuid());
-
 	if (fd < 0) {
 		perror("socket");
 		return 1;
 	}
 
-	if (argc <= 1) {
-		fprintf(stderr, "rping: no arguments\n");
-		return 1;
+	/* Parse command line options */
+	while ((ch = getopt(argc, argv, "Ai:")) != -1) {
+		switch(ch) {
+		case 'A':
+			A_flag = 1;
+			break;
+		case 'i':
+			i_interval = strtod(optarg, &end) * 1000;
+			if (*optarg != '\0' && *end != '\0')
+				usage("Invalid interval");
+			if (i_interval < 1000 && getuid() != 0)
+				usage("Dangerous interval");
+			break;
+		case 'V':
+			fprintf(stderr, "version %s\n", VERSION);
+		case 'h':
+			usage(NULL);
+			/* NOTREACHED */
+		default:
+			usage(NULL);
+			/* NOTREACHED */
+		}
+	}
+	argc -= optind;
+	argv += optind;
+	if (argc < 1) {
+		usage("no arguments");
 	}
 
 	/* Prepare statistics and datapacket */
@@ -267,7 +317,7 @@ int main(int argc, char *argv[])
 
 	/* Add and schedule targets */
 	SLIST_INIT(&head);
-	for (i=argc-1; i>0; i--) {
+	for (i=argc-1; i>=0; i--) {
 		t = malloc(sizeof(*t));
 		memset(t, 0, sizeof(*t));
 		memset(t->res, ' ', sizeof(t->res));
@@ -275,8 +325,8 @@ int main(int argc, char *argv[])
 		strncat(t->host, argv[i], sizeof(t->host) - 1);
 		SLIST_INSERT_HEAD(&head, t, entries);
 	}
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
+	tv.tv_sec = i_interval / 1000;
+	tv.tv_usec = i_interval % 1000 * 1000;
 	SLIST_FOREACH(t, &head, entries) {
 		ev = event_new(ev_base, fd, EV_PERSIST,
 		    write_packet, t);
