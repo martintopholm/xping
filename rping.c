@@ -13,6 +13,7 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -69,7 +70,6 @@ void resolved_host(int result, char type, int count, int ttl, void *addresses,
 	struct target *t = thunk;
 
 	if (result == DNS_ERR_NONE && type == DNS_IPv4_A && count > 0) {
-		t->sin.sin_len = sizeof(t->sin);
 		t->sin.sin_family = AF_INET;
 		memmove(&t->sin.sin_addr, (struct in_addr *)addresses,
 		    sizeof(t->sin.sin_addr));
@@ -115,7 +115,8 @@ void read_packet(int fd, short what, void *thunk)
 
 		/* Search for our target */
 		SLIST_FOREACH(t, &head, entries) {
-			if (memcmp(&t->sin, &sin, sizeof(t->sin)) == 0) {
+			if (memcmp(&t->sin.sin_addr, &sin.sin_addr,
+			    sizeof(t->sin.sin_addr)) == 0) {
 				break;
 			}
 		}
@@ -198,8 +199,11 @@ void redraw()
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
 
-	mvprintw(0, 0, "%d %d %d\n", imax, ifirst, ilast);
-	y = 1;
+	move(0, 0);
+	clrtoeol();
+	mvprintw(0, col/2 - 37/2, "rping [compiled %s %s]\n", __DATE__, __TIME__);
+
+	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
 		mvprintw(y, 0, "%19.19s ", t->host);
 		for (i=ifirst; i<ilast; i++) {
@@ -234,6 +238,16 @@ int main(int argc, char *argv[])
 	/* Open RAW-socket and drop root-privs */
 	fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	setuid(getuid());
+
+	if (fd < 0) {
+		perror("socket");
+		return 1;
+	}
+
+	if (argc <= 1) {
+		fprintf(stderr, "rping: no arguments\n");
+		return 1;
+	}
 
 	/* Prepare statistics and datapacket */
 	stats = &statistics;
