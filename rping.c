@@ -1,4 +1,18 @@
+/*-
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * <mph@hoth.dk> wrote this file. As long as you retain this notice you
+ * can do whatever you want with this stuff. If we meet some day, and you think
+ * this stuff is worth it, you can buy me a beer in return Martin Topholm
+ * ----------------------------------------------------------------------------
+ */
+
+#include <sys/param.h>
+
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -10,10 +24,11 @@
 
 #include "queue.h"
 
-
 struct event_base *ev_base;
 struct evdns_base *dns;
 
+char outpacket[IP_MAXPACKET];
+int datalen = 56;
 int ident;
 
 #define NUM 300
@@ -32,55 +47,137 @@ struct target {
 	SLIST_ENTRY(target) entries;
 };
 
-void redraw();
+struct statistics {
+	int		transmitted;
+	int		received;
+
+	int		sendto_err;
+	int		recvfrom_err;
+	int		runt;
+	int		other;
+} statistics, *stats;
+
+static void redraw();
+static u_short in_cksum(u_short *, int);
+
 
 // struct in_addr *in_addrs = addresses; 
 // struct in6_addr *in6_addrs = addresses;
 void resolved_host(int result, char type, int count, int ttl, void *addresses,
     void *thunk) 
 {
-	char asdf[64];
 	struct target *t = thunk;
 
-
 	if (result == DNS_ERR_NONE && type == DNS_IPv4_A && count > 0) {
+		t->sin.sin_len = sizeof(t->sin);
 		t->sin.sin_family = AF_INET;
 		memmove(&t->sin.sin_addr, (struct in_addr *)addresses,
 		    sizeof(t->sin.sin_addr));
 		t->resolved = 1;
 	}
 
-	evutil_format_sockaddr_port((struct sockaddr *)&t->sin, asdf, sizeof(asdf));
-	mvprintw(10, 0, "resolved_host %d %d %d %d %s %s\n", result, type, count, ttl, t->host, asdf );
 }
 
 void read_packet(int fd, short what, void *thunk)
 {
+	struct target *t;
+	char inpacket[IP_MAXPACKET];
+	struct sockaddr_in sin;
+	struct ip *ip;
+	struct icmp *icp;
+	socklen_t salen;
+	int hlen;
+	int seq;
+	int n;
+
+	salen = sizeof(sin);
+	memset(inpacket, 0, sizeof(inpacket));
+	n = recvfrom(fd, inpacket, sizeof(inpacket), 0,
+	    (struct sockaddr *)&sin, &salen); 
+	if (n < 0) {
+		stats->recvfrom_err++;
+		return;
+	}
+	stats->received++;
+
+	ip = (struct ip *)inpacket;
+	hlen = ip->ip_hl << 2;
+	if (n < hlen + ICMP_MINLEN) {
+		stats->runt++;
+		return;
+	}
+
+	icp = (struct icmp *)(inpacket + hlen);
+	if (icp->icmp_type == ICMP_ECHOREPLY) {
+		if (icp->icmp_id != ident)
+			return; /*  skip other ping sessions */
+		seq = ntohs(icp->icmp_seq);
+
+		/* Search for our target */
+		SLIST_FOREACH(t, &head, entries) {
+			if (memcmp(&t->sin, &sin, sizeof(t->sin)) == 0) {
+				break;
+			}
+		}
+		if (t == NULL) 
+			return; /* reply from unknown src */
+
+		/* XXX Checksum is propably verified by host OS */
+		t->res[seq % NUM] = '.';
+	} else {
+		stats->other++;
+		// XXX handle unreach and co
+	}
+	redraw();
 }
 
 void write_packet(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
+	struct icmp *icp;
+	int len;
+	int n;
 
+	/* Register unresolved missed packets */
 	if (!t->resolved) {
 		if (t->npkts > 0) {
-			SETRES(t, -1, '#');
+			SETRES(t, -1, '@');
 		}
-		SETRES(t, 0, ' ');
+		SETRES(t, 0, '@');
 		t->npkts++;
 		redraw();
 		return;
 	}
 
+	/* Register missed reply */
 	if (t->npkts > 0 && GETRES(t, -1) == ' ') {
 		SETRES(t, -1, '?');
 		//write(STDOUT_FILENO, "\a", 1);
 	}
 
-	/* FIXME Send packet here */
+	/* Send packet */
+	len = ICMP_MINLEN + datalen;
+	icp = (struct icmp *)outpacket;
+	icp->icmp_type = ICMP_ECHO;
+	icp->icmp_code = 0;
+	icp->icmp_cksum = 0;
+	icp->icmp_seq = htons(t->npkts);
+	icp->icmp_id = ident;
+	icp->icmp_cksum = in_cksum((u_short *)icp, len);
 	SETRES(t, 0, ' ');
-	t->npkts++;
 
+	n = sendto(fd, outpacket, len, 0, (struct sockaddr *)&t->sin,
+            sizeof(t->sin));
+	if (n < 0) {
+		stats->sendto_err++;
+		SETRES(t, 0, '$'); /* transmit error */
+	}
+	if (n != len) {
+		stats->sendto_err++;
+		SETRES(t, 0, '!'); /* partial transmit */
+	}
+	stats->transmitted++;
+	t->npkts++;
 	redraw();
 }
 
@@ -96,7 +193,8 @@ void redraw()
 	t = SLIST_FIRST(&head);
 	if (t == NULL) return;
 
-	imax = (t->npkts > col - 20 ? col - 20 : t->npkts);
+	imax = MIN(t->npkts, col - 20);
+	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
 
@@ -105,11 +203,21 @@ void redraw()
 	SLIST_FOREACH(t, &head, entries) {
 		mvprintw(y, 0, "%19.19s ", t->host);
 		for (i=ifirst; i<ilast; i++) {
-			addch(t->res[i % NUM]);
+			if (i < t->npkts) addch(t->res[i % NUM]);
+			else addch(' ');
 		}
 		y++;
 	}
-	move(y, 0);
+
+	y++;
+	mvprintw(y++, 0, "Sent: %d\n", stats->transmitted);
+	mvprintw(y++, 0, "Recv: %d\n", stats->received);
+	mvprintw(y++, 0, "ErrO: %d\n", stats->sendto_err);
+	mvprintw(y++, 0, "ErrI: %d\n", stats->recvfrom_err);
+	mvprintw(y++, 0, "Runt: %d\n", stats->runt);
+	mvprintw(y++, 0, "Othr: %d\n", stats->other);
+
+	move(y++, 0);
 
 	refresh();
 }
@@ -127,9 +235,23 @@ int main(int argc, char *argv[])
 	fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	setuid(getuid());
 
+	/* Prepare statistics and datapacket */
+	stats = &statistics;
+	memset(stats, 0, sizeof(stats));
+	ident = htons(getpid() & 0xffff);
+	for (i=0; i<datalen; i++) {
+		outpacket[ICMP_MINLEN + i] = '0' + i;
+	}
+
+	/* Prepare event system and inbound socket */
 	ev_base = event_base_new();
 	dns = evdns_base_new(ev_base, 1);
+	evutil_make_socket_nonblocking(fd);
+	ev = event_new(ev_base, fd, EV_READ|EV_PERSIST,
+	    read_packet, NULL);
+	event_add(ev, NULL);
 
+	/* Add and schedule targets */
 	SLIST_INIT(&head);
 	for (i=argc-1; i>0; i--) {
 		t = malloc(sizeof(*t));
@@ -142,11 +264,13 @@ int main(int argc, char *argv[])
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 	SLIST_FOREACH(t, &head, entries) {
-		ev = event_new(ev_base, fd, EV_READ|EV_PERSIST,
+		ev = event_new(ev_base, fd, EV_PERSIST,
 		    write_packet, t);
 		event_add(ev, &tv);
 		usleep(100*1000);
 	}
+
+	/* Resolve hostnames */
 	SLIST_FOREACH(t, &head, entries) {
 		salen = sizeof(t->sin);
 		if (evutil_parse_sockaddr_port(t->host,
@@ -164,4 +288,48 @@ int main(int argc, char *argv[])
 
 	close(fd);
 	return 0;
+}
+
+/* From the original ping.c by Mike Muus... */
+/*
+ * in_cksum --
+ *      Checksum routine for Internet Protocol family headers (C Version)
+ */
+u_short
+in_cksum(u_short *addr, int len)
+{
+	int nleft, sum;
+	u_short *w;
+	union {
+		u_short us;
+		u_char  uc[2];
+	} last;
+	u_short answer;
+
+	nleft = len;
+	sum = 0;
+	w = addr;
+
+	/*
+	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
+	 * sequential 16 bit words to it, and at the end, fold back all the
+	 * carry bits from the top 16 bits into the lower 16 bits.
+	 */
+	while (nleft > 1)  {
+		sum += *w++;
+		nleft -= 2;
+	}
+
+	/* mop up an odd byte, if necessary */
+	if (nleft == 1) {
+		last.uc[0] = *(u_char *)w;
+		last.uc[1] = 0;
+		sum += last.us;
+	}
+
+	/* add back carry outs from top 16 bits to low 16 bits */
+	sum = (sum >> 16) + (sum & 0xffff);     /* add hi 16 to low 16 */
+	sum += (sum >> 16);                     /* add carry */
+	answer = ~sum;                          /* truncate to 16 bits */
+	return(answer);
 }
