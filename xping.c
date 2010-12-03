@@ -232,9 +232,6 @@ void redraw()
 	y++;
 	mvprintw(y++, 0, "Legend: .=echo-reply  ?=no-reply   #=icmp-other"); 
 	mvprintw(y++, 0, "        @=dns-pending !=send-error $=senderror ?");
-
-	
-
 	move(y++, 0);
 
 	refresh();
