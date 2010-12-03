@@ -15,8 +15,8 @@ libevent2:
 	wget http://monkey.org/~provos/libevent-2.0.9-rc.tar.gz
 	tar -xzvf libevent-2.0.9-rc.tar.gz
 	cd libevent-2.0.9-rc && ./configure && make
-	size ./libevent-2.0.9-rc/.libs/libevent.so
 	cp ./libevent-2.0.9-rc/.libs/libevent.a .
+	size libevent.a
 	
 xping: xping.o
 	gcc $(LDFLAGS) -g -o xping $< $(LIBS)
