@@ -1,0 +1,61 @@
+.\"
+.\" ----------------------------------------------------------------------------
+.\" "THE BEER-WARE LICENSE" (Revision 42):
+.\" <mph@hoth.dk> wrote this file. As long as you retain this notice you
+.\" can do whatever you want with this stuff. If we meet some day, and you think
+.\" this stuff is worth it, you can buy me a beer in return Martin Topholm
+.\" ----------------------------------------------------------------------------
+.\" 
+.Dd December 6, 2010
+.Dt XPING 8
+.Os
+.Sh NAME
+.Nm xping
+.Nd Multiple target PINGer
+.Sh SYNOPSIS
+.Nm
+.Op Fl AVh
+.Op Fl i Ar interval
+.Op Ar host Op ...
+.Sh DESCRIPTION
+.Nm
+is a simple PING program continiously probing multiple hosts using
+ICMP-ECHO. As packets are received dots are printed on the screen.
+Host not responding before next packet i due will get a questionmark
+in the display. The probing stops when SIGINT received.
+.Pp
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl A
+Print a bell character on stdout when a packet is missed.
+.It Fl V
+Print the "version" of xping and exit.
+.It Fl h
+Display program usage and exit.
+.It Fl i Ar interval
+Specifies interval between successive packets to a host. Default
+is 1.0 seconds.
+.El
+.Sh DIAGNOSTICS
+.Bl -tag -width indent
+.It "socket: Operation not permitted"
+.Nm
+could not open a raw socket. Program should be setuid root or started
+as root.
+.El
+.Sh AUTHORS
+.Nm
+was written by
+.An Martin Topholm Aq mph@hoth.dk .
+.Nm
+uses libevent2 by Niels Provos <provos@citi.umich.edu> and Nick Mathewson.
+.Sh BUGS
+Only ICMP-ECHOREPLY is considered, other informative packets may exists.
+.Pp
+.Nm
+is not very informative on errors.
+.Pp
+For larger amounts of polling the current STAILQ implementation may
+be insufficient.
+.Pp
+Probably more.
