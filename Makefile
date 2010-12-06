@@ -19,7 +19,7 @@ libevent2:
 	size libevent.a
 	
 xping: xping.o
-	gcc $(LDFLAGS) -g -o xping $< $(LIBS)
+	gcc $(LDFLAGS) -g -o xping xping.o $(LIBS)
 
 install:
 	sudo install -m 4555 xping /usr/local/sbin/xping
