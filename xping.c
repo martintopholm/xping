@@ -93,7 +93,9 @@ void read_packet(int fd, short what, void *thunk)
 	char inpacket[IP_MAXPACKET];
 	struct sockaddr_in sin;
 	struct ip *ip;
+	struct ip *oip;
 	struct icmp *icp;
+	struct icmp *oicp;
 	socklen_t salen;
 	int hlen;
 	int seq;
@@ -107,7 +109,6 @@ void read_packet(int fd, short what, void *thunk)
 		stats->recvfrom_err++;
 		return;
 	}
-	stats->received++;
 
 	ip = (struct ip *)inpacket;
 	hlen = ip->ip_hl << 2;
@@ -134,9 +135,35 @@ void read_packet(int fd, short what, void *thunk)
 
 		/* XXX Checksum is propably verified by host OS */
 		t->res[seq % NUM] = '.';
+		stats->received++;
 	} else {
+		/* Check aspects of the original packet */
+		oip = (struct ip *)icp->icmp_data;
+		oicp = (struct icmp *)(oip + 1);
+		if (oip->ip_p != IPPROTO_ICMP)
+			return;
+		if (oicp->icmp_type != ICMP_ECHO)
+			return;
+		if (oicp->icmp_id != ident)
+			return;
+		seq = ntohs(oicp->icmp_seq);
+
+		/* Search for our target */
+		SLIST_FOREACH(t, &head, entries) {
+			if (memcmp(&t->sin.sin_addr, &oip->ip_dst,
+			    sizeof(t->sin.sin_addr)) == 0) {
+				break;
+			}
+		}
+		if (t == NULL) 
+			return; /* original target is unknown */
+
+		if (icp->icmp_type == ICMP_UNREACH) {
+			t->res[seq % NUM] = '#';
+		} else {
+			t->res[seq % NUM] = '%';
+		}
 		stats->other++;
-		// XXX handle unreach and co
 	}
 	redraw();
 }
@@ -230,8 +257,8 @@ void redraw()
 	mvprintw(y++, 0, "Runt: %d", stats->runt);
 	mvprintw(y++, 0, "Othr: %d", stats->other);
 	y++;
-	mvprintw(y++, 0, "Legend: .=echo-reply  ?=no-reply   #=icmp-other"); 
-	mvprintw(y++, 0, "        @=dns-pending !=send-error $=senderror ?");
+	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach %=other"); 
+	mvprintw(y++, 0, "       send: @=resolving !=partial $=other");
 	move(y++, 0);
 
 	refresh();
