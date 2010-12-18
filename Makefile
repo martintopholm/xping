@@ -13,14 +13,14 @@ all: xping xping.8.gz
 ncurses-dev:
 	sudo aptitude install ncurses-dev
 
-libevent2:
+libevent.a:
 	wget http://monkey.org/~provos/libevent-2.0.9-rc.tar.gz
 	tar -xzvf libevent-2.0.9-rc.tar.gz
 	cd libevent-2.0.9-rc && ./configure && make
 	cp ./libevent-2.0.9-rc/.libs/libevent.a .
 	size libevent.a
 	
-xping: xping.o
+xping: xping.o libevent.a
 	gcc $(LDFLAGS) -g -o xping xping.o $(LIBS)
 
 xping.8.gz: xping.8
