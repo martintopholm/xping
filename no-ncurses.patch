@@ -1,0 +1,134 @@
+Index: xping.c
+===================================================================
+--- xping.c	(revision 12200)
++++ xping.c	(working copy)
+@@ -8,11 +8,13 @@
+  */
+ 
+ #include <sys/param.h>
++#include <sys/ioctl.h>
+ 
+ #include <netinet/in.h>
+ #include <netinet/ip.h>
+ #include <netinet/ip_icmp.h>
+ 
++#include <stdarg.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -21,7 +23,7 @@
+ 
+ #include <event2/event.h>
+ #include <event2/dns.h>
+-#include <ncurses.h>
++//#include <ncurses.h>
+ 
+ #include "queue.h"
+ 
+@@ -218,15 +220,43 @@
+ 	redraw();
+ }
+ 
++void vt100clear()
++{
++	fprintf(stdout, "[2J");
++}
++
++void vt100print(int row, int col, const char *fmt, ...)
++{
++	va_list ap;
++
++	fprintf(stdout, "[%d;%dH", row, col);
++	fprintf(stdout, "[K");
++	va_start(ap, fmt);
++	vfprintf(stdout, fmt, ap);
++	va_end(ap);
++}
++
++void vt100addch(int ch)
++{
++	fputc(ch, stdout);
++}
++
+ void redraw()
+ {
+ 	struct target *t;
+-	int row, col;
++	struct winsize wsz;
++	char *p;
++	int col;
+ 	int y;
+ 
+ 	int i, imax, ifirst, ilast;
+ 
+-	getmaxyx(stdscr,row,col);
++	if ((p = getenv("COLUMNS")) != NULL && *p != '\0')
++		col = atoi(p);
++	else if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) != -1 &&
++	    wsz.ws_col > 0)
++		col = wsz.ws_col - 2;
++
+ 	t = SLIST_FIRST(&head);
+ 	if (t == NULL) return;
+ 
+@@ -235,33 +265,29 @@
+ 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
+ 	ilast = t->npkts;
+ 
+-	move(0, 0);
+-	clrtoeol();
+-	mvprintw(0, col/2 - strlen(VERSION)/2, "%s", VERSION);
+-
++	vt100print(0, col/2 - strlen(VERSION)/2, "%s", VERSION);
+ 	y = 2;
+ 	SLIST_FOREACH(t, &head, entries) {
+-		mvprintw(y, 0, "%19.19s ", t->host);
++		vt100print(y, 0, "%19.19s ", t->host);
+ 		for (i=ifirst; i<ilast; i++) {
+-			if (i < t->npkts) addch(t->res[i % NUM]);
+-			else addch(' ');
++			if (i < t->npkts) vt100addch(t->res[i % NUM]);
++			else vt100addch(' ');
+ 		}
+ 		y++;
+ 	}
+ 
+ 	y++;
+-	mvprintw(y++, 0, "Sent: %d", stats->transmitted);
+-	mvprintw(y++, 0, "Recv: %d", stats->received);
+-	mvprintw(y++, 0, "ErrO: %d", stats->sendto_err);
+-	mvprintw(y++, 0, "ErrI: %d", stats->recvfrom_err);
+-	mvprintw(y++, 0, "Runt: %d", stats->runt);
+-	mvprintw(y++, 0, "Othr: %d", stats->other);
++	vt100print(y++, 0, "Sent: %d", stats->transmitted);
++	vt100print(y++, 0, "Recv: %d", stats->received);
++	vt100print(y++, 0, "ErrO: %d", stats->sendto_err);
++	vt100print(y++, 0, "ErrI: %d", stats->recvfrom_err);
++	vt100print(y++, 0, "Runt: %d", stats->runt);
++	vt100print(y++, 0, "Othr: %d", stats->other);
+ 	y++;
+-	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach %=other"); 
+-	mvprintw(y++, 0, "       send: @=resolving !=partial $=other");
+-	move(y++, 0);
+-
+-	refresh();
++	vt100print(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach %=other"); 
++	vt100print(y++, 0, "       send: @=resolving !=partial $=other");
++	vt100print(y++, 0, "");
++	fflush(stdout);
+ }
+ 
+ void usage(const char *whine)
+@@ -370,9 +396,10 @@
+ 		}
+ 	}
+ 
+-	initscr();
++	//initscr();
++	vt100clear();
+ 	event_base_dispatch(ev_base);
+-	endwin();
++	//endwin();
+ 
+ 	close(fd);
+ 	return 0;
