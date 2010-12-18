@@ -21,7 +21,7 @@ libevent.a:
 	cp ./libevent-2.0.9-rc/.libs/libevent.a .
 	size libevent.a
 	
-xping: xping.o libevent.a
+xping: libevent.a xping.o 
 	gcc $(LDFLAGS) -g -o xping xping.o $(LIBS)
 
 xping.8.gz: xping.8
@@ -36,8 +36,8 @@ xping.8.html: xping.8
 install:
 	mkdir -p $(SBINPATH)
 	mkdir -p $(MANPATH)/man8
-	sudo install -m 4555 xping $(SBINPATH)/
-	sudo install -m 444 xping.8.gz $(MANPATH)/man8/
+	install -m 4555 xping $(SBINPATH)/
+	install -m 444 xping.8.gz $(MANPATH)/man8/
 
 clean:
 	rm -f xping xping.o xping.8.gz xping.8.txt xping.8.html
