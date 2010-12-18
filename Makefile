@@ -2,8 +2,9 @@
 # PMake
 #
 
-SBINPATH=/usr/local/bin
-MANPATH=/usr/local/man
+PREFIX=/usr/local
+SBINPATH=$(PREFIX)/bin
+MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I./libevent-2.0.9-rc -I./libevent-2.0.9-rc/include
 LDFLAGS=-L./libevent-2.0.9-rc/.libs
 LIBS=-lcurses libevent.a -lrt
