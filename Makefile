@@ -24,7 +24,7 @@ xping: xping.o
 	gcc $(LDFLAGS) -g -o xping xping.o $(LIBS)
 
 xping.8.gz: xping.8
-	gzip -k -f xping.8
+	cat xping.8 | gzip > xping.8.gz
 
 xping.8.txt: xping.8
 	groff -mman -Tascii xping.8 | sed 's/.//g' > xping.8.txt
