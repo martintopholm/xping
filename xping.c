@@ -32,6 +32,7 @@
 
 /* Option flags */
 int	i_interval = 1000;
+int	a_flag = 0;
 int	A_flag = 0;
 
 /* Global structures */
@@ -135,6 +136,7 @@ void read_packet(int fd, short what, void *thunk)
 
 		/* XXX Checksum is propably verified by host OS */
 		t->res[seq % NUM] = '.';
+		if (a_flag) write(STDOUT_FILENO, "\a", 1);
 		stats->received++;
 	} else {
 		/* Check aspects of the original packet */
@@ -295,8 +297,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "Ai:")) != -1) {
+	while ((ch = getopt(argc, argv, "Aai:")) != -1) {
 		switch(ch) {
+		case 'a':
+			a_flag = 1;
 		case 'A':
 			A_flag = 1;
 			break;
