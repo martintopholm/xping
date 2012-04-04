@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "Aai:")) != -1) {
+	while ((ch = getopt(argc, argv, "Aai:h")) != -1) {
 		switch(ch) {
 		case 'a':
 			a_flag = 1;
