@@ -223,15 +223,15 @@ void write_packet(int fd, short what, void *thunk)
 void redraw()
 {
 	struct target *t;
-	int row, col;
+	int col;
 	int y;
 
 	int i, imax, ifirst, ilast;
 
-	getmaxyx(stdscr,row,col);
 	t = SLIST_FIRST(&head);
 	if (t == NULL) return;
 
+	col = getmaxx(stdscr);
 	imax = MIN(t->npkts, col - 20);
 	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
