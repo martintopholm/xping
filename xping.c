@@ -72,10 +72,10 @@ static void redraw();
 static u_short in_cksum(u_short *, int);
 
 
-// struct in_addr *in_addrs = addresses; 
+// struct in_addr *in_addrs = addresses;
 // struct in6_addr *in6_addrs = addresses;
 void resolved_host(int result, char type, int count, int ttl, void *addresses,
-    void *thunk) 
+    void *thunk)
 {
 	struct target *t = thunk;
 
@@ -105,7 +105,7 @@ void read_packet(int fd, short what, void *thunk)
 	salen = sizeof(sin);
 	memset(inpacket, 0, sizeof(inpacket));
 	n = recvfrom(fd, inpacket, sizeof(inpacket), 0,
-	    (struct sockaddr *)&sin, &salen); 
+	    (struct sockaddr *)&sin, &salen);
 	if (n < 0) {
 		stats->recvfrom_err++;
 		return;
@@ -131,7 +131,7 @@ void read_packet(int fd, short what, void *thunk)
 				break;
 			}
 		}
-		if (t == NULL) 
+		if (t == NULL)
 			return; /* reply from unknown src */
 
 		/* XXX Checksum is propably verified by host OS */
@@ -157,7 +157,7 @@ void read_packet(int fd, short what, void *thunk)
 				break;
 			}
 		}
-		if (t == NULL) 
+		if (t == NULL)
 			return; /* original target is unknown */
 
 		if (icp->icmp_type == ICMP_UNREACH) {
@@ -259,7 +259,7 @@ void redraw()
 	mvprintw(y++, 0, "Runt: %d", stats->runt);
 	mvprintw(y++, 0, "Othr: %d", stats->other);
 	y++;
-	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach %=other"); 
+	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach %=other");
 	mvprintw(y++, 0, "       send: @=resolving !=partial $=other");
 	move(y++, 0);
 
@@ -301,6 +301,7 @@ int main(int argc, char *argv[])
 		switch(ch) {
 		case 'a':
 			a_flag = 1;
+			break;
 		case 'A':
 			A_flag = 1;
 			break;
