@@ -220,6 +220,18 @@ void write_packet(int fd, short what, void *thunk)
 	redraw();
 }
 
+void write_first_packet(int fd, short what, void *thunk)
+{
+	struct event *ev;
+	struct timeval tv;
+
+	write_packet(fd, what, thunk);
+	tv.tv_sec = i_interval / 1000;
+	tv.tv_usec = i_interval % 1000 * 1000;
+	ev = event_new(ev_base, fd, EV_PERSIST, write_packet, thunk);
+	event_add(ev, &tv);
+}
+
 void redraw()
 {
 	struct target *t;
@@ -355,13 +367,14 @@ int main(int argc, char *argv[])
 		strncat(t->host, argv[i], sizeof(t->host) - 1);
 		SLIST_INSERT_HEAD(&head, t, entries);
 	}
-	tv.tv_sec = i_interval / 1000;
-	tv.tv_usec = i_interval % 1000 * 1000;
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
 	SLIST_FOREACH(t, &head, entries) {
-		ev = event_new(ev_base, fd, EV_PERSIST,
-		    write_packet, t);
+		ev = event_new(ev_base, fd, 0, write_first_packet, t);
 		event_add(ev, &tv);
-		usleep(100*1000);
+		tv.tv_usec += 100*1000; /* target spacing: 100ms */
+		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
+		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
 	}
 
 	/* Resolve hostnames */
