@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "Aai:h")) != -1) {
+	while ((ch = getopt(argc, argv, "Aai:hV")) != -1) {
 		switch(ch) {
 		case 'a':
 			a_flag = 1;
@@ -313,7 +313,8 @@ int main(int argc, char *argv[])
 				usage("Dangerous interval");
 			break;
 		case 'V':
-			fprintf(stderr, "version %s\n", VERSION);
+			fprintf(stderr, "%s\n", VERSION);
+			return (0);
 		case 'h':
 			usage(NULL);
 			/* NOTREACHED */
