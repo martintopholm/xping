@@ -14,7 +14,7 @@
 .Nd Multiple target PINGer
 .Sh SYNOPSIS
 .Nm
-.Op Fl AVh
+.Op Fl 46AVh
 .Op Fl i Ar interval
 .Op Ar host Op ...
 .Sh DESCRIPTION
@@ -26,6 +26,10 @@ in the display. The probing stops when SIGINT received.
 .Pp
 .Sh OPTIONS
 .Bl -tag -width indent
+.It Fl 4
+Force xping to resolve IPv4 address only.
+.It Fl 6
+Force xping to resolve IPv6 address only.
 .It Fl A
 Print a bell character on stdout when a packet is missed.
 .It Fl V
@@ -52,8 +56,6 @@ was written by
 .Nm
 uses libevent2 by Niels Provos <provos@citi.umich.edu> and Nick Mathewson.
 .Sh BUGS
-Only ICMP-ECHOREPLY is considered, other informative packets may exists.
-.Pp
 .Nm
 is not very informative on errors.
 .Pp
