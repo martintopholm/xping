@@ -49,7 +49,7 @@ char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
 int	ident;
 
-#define ICMP6ECHOLEN 8
+#define ICMP6ECHOLEN sizeof(struct icmp6_hdr)
 #define NUM 300
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
@@ -274,12 +274,19 @@ read_packet6(int fd, short what, void *thunk)
 		if (t == NULL)
 			return; /* reply from unknown src */
 
+		if (n != sizeof(struct icmp6_hdr) + datalen)
+			return;
+
 		/* XXX Checksum is propably verified by host OS */
+
 		t->res[seq % NUM] = '.';
 		if (a_flag)
 			write(STDOUT_FILENO, "\a", 1);
 		stats->received++;
 	} else {
+		if (n < ICMP6ECHOLEN * 2 + sizeof(struct ip6_hdr))
+			return;
+
 		/* Check aspects of the original packet */
 		oip6 = (struct ip6_hdr *)(icmp6h + 1);
 		oicmp6h = (struct icmp6_hdr *)(oip6 + 1);
