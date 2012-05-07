@@ -116,12 +116,18 @@ struct target *findtarget(int af, void *address)
 	return (t);
 }
 
-void resolved_host(int result, char type, int count, int ttl, void *addresses,
+/*
+ * Callback for resolved domain names. On missing AAAA-record retry for
+ * A-record instead.
+ */
+void
+resolved_host(int result, char type, int count, int ttl, void *addresses,
     void *thunk)
 {
 	struct target *t = thunk;
 
-	/* libevent resolver may give NXDOMAIN for an AAAA query when
+	/*
+	 * libevent resolver may give NXDOMAIN for an AAAA query when
 	 * domain exists, but given RR doesn't. It appears when using
 	 * search domains. Resolver appears try search domains after
 	 * getting NOERROR with 0 answers.
@@ -153,7 +159,8 @@ void resolved_host(int result, char type, int count, int ttl, void *addresses,
 	}
 }
 
-void read_packet4(int fd, short what, void *thunk)
+void
+read_packet4(int fd, short what, void *thunk)
 {
 	struct target *t;
 	char inpacket[IP_MAXPACKET];
@@ -229,7 +236,8 @@ void read_packet4(int fd, short what, void *thunk)
 	redraw();
 }
 
-void read_packet6(int fd, short what, void *thunk)
+void
+read_packet6(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 	char inpacket[IP_MAXPACKET];
@@ -298,13 +306,13 @@ void read_packet6(int fd, short what, void *thunk)
 	redraw();
 }
 
-int write_packet4(int fd, short what, void *thunk)
+int
+write_packet4(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 	struct icmp *icp;
 	int len;
 
-	/* Send packet */
 	len = ICMP_MINLEN + datalen;
 	icp = (struct icmp *)outpacket;
 	icp->icmp_type = ICMP_ECHO;
@@ -313,12 +321,13 @@ int write_packet4(int fd, short what, void *thunk)
 	icp->icmp_seq = htons(t->npkts);
 	icp->icmp_id = htons(ident);
 	icp->icmp_cksum = in_cksum((u_short *)icp, len);
-	SETRES(t, 0, ' ');
 
-	return sendto(fd, outpacket, len, 0, sa(t), sizeof(struct sockaddr_in));
+	return sendto(fd, outpacket, len, 0, sa(t),
+	    sizeof(struct sockaddr_in));
 }
 
-int write_packet6(int fd, short what, void *thunk)
+int
+write_packet6(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 	struct icmp6_hdr *icmp6h;
@@ -331,23 +340,27 @@ int write_packet6(int fd, short what, void *thunk)
 	icmp6h->icmp6_cksum = 0;
 	icmp6h->icmp6_seq = htons(t->npkts);
 	icmp6h->icmp6_id = htons(ident);
-	return sendto(fd, outpacket6, len, 0, sa(t), sizeof(struct sockaddr_in6));
+	return sendto(fd, outpacket6, len, 0, sa(t),
+	    sizeof(struct sockaddr_in6));
 }
 
-void write_packet(int fd, short what, void *thunk)
+/*
+ * Register status for send and "timed out" requests and send appropriate
+ * request for target.
+ */
+void
+write_packet(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 	int len;
 	int n;
 
-	/* Register missed reply */
 	if (t->npkts > 0 && GETRES(t, -1) == ' ') {
 		SETRES(t, -1, '?');
 		if (A_flag)
 			write(STDOUT_FILENO, "\a", 1);
 	}
 
-	/* Send protocol packet */
 	if (sa(t)->sa_family == AF_INET6) {
 		n = write_packet6(fd6, what, thunk);
 		len = ICMP6ECHOLEN + datalen;
@@ -355,8 +368,8 @@ void write_packet(int fd, short what, void *thunk)
 		n = write_packet4(fd4, what, thunk);
 		len = ICMP_MINLEN + datalen;
 	}
+	SETRES(t, 0, ' ');
 
-	/* Register transmit result */
 	if (n < 0) {
 		stats->sendto_err++;
 		SETRES(t, 0, '$'); /* transmit error */
@@ -370,7 +383,12 @@ void write_packet(int fd, short what, void *thunk)
 	redraw();
 }
 
-void write_first_packet(int fd, short what, void *thunk)
+/*
+ * Does the initial scheduling of the packet transmission. Reschedules
+ * callbck to self if DNS isn't resolved (and IPv4 or IPv6 socket determined).
+ */
+void
+write_first_packet(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 	struct event *ev;
@@ -403,7 +421,11 @@ void write_first_packet(int fd, short what, void *thunk)
 	event_add(ev, &tv);
 }
 
-void redraw()
+/*
+ * Draws the recorded replies on the terminal.
+ */
+void
+redraw()
 {
 	struct target *t;
 	int col;
@@ -445,25 +467,34 @@ void redraw()
 	mvprintw(y++, 0, "Runt: %d", stats->runt);
 	mvprintw(y++, 0, "Othr: %d", stats->other);
 	y++;
-	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach %=other");
+	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach "
+	    "%=other");
 	mvprintw(y++, 0, "       send: @=resolving !=partial $=other");
 	move(y++, 0);
 
 	refresh();
 }
 
-void usage(const char *whine)
+void
+usage(const char *whine)
 {
 	if (whine != NULL) {
 		fprintf(stderr, "%s\n", whine);
 	}
 	fprintf(stderr,
-	    "usage: xping [-AVh] [-i interval] host [host [...]]\n"
+	    "usage: xping [-46AVh] [-i interval] host [host [...]]\n"
 	    "\n");
 	exit(EX_USAGE);
 }
 
-int main(int argc, char *argv[])
+/*
+ * Continiously probing multiple hosts using ICMP-ECHO. As packets are
+ * received dots are printed on the screen. Host not responding before
+ * next packet in due time will get a questionmark in the display. The
+ * probing stops when SIGINT is received.
+ */
+int
+main(int argc, char *argv[])
 {
 	struct timeval tv;
 	struct event *ev;
