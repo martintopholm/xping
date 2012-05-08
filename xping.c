@@ -49,7 +49,7 @@ char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
 int	ident;
 
-#define ICMP6ECHOLEN sizeof(struct icmp6_hdr)
+#define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 #define NUM 300
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
@@ -204,12 +204,15 @@ read_packet4(int fd, short what, void *thunk)
 		if (t == NULL)
 			return; /* reply from unknown src */
 
-		/* XXX Checksum is propably verified by host OS */
 		t->res[seq % NUM] = '.';
 		if (a_flag)
 			write(STDOUT_FILENO, "\a", 1);
 		stats->received++;
 	} else {
+		/* Skip short icmp error packets. */
+		if (n < ICMP_MINLEN * 2 + sizeof(struct ip))
+			return;
+
 		/* Check aspects of the original packet */
 		oip = (struct ip *)icp->icmp_data;
 		oicp = (struct icmp *)(oip + 1);
@@ -257,7 +260,7 @@ read_packet6(int fd, short what, void *thunk)
 		stats->recvfrom_err++;
 		return;
 	}
-	if (n < ICMP6ECHOLEN) {
+	if (n < ICMP6_MINLEN) {
 		stats->runt++;
 		return;
 	}
@@ -277,14 +280,13 @@ read_packet6(int fd, short what, void *thunk)
 		if (n != sizeof(struct icmp6_hdr) + datalen)
 			return;
 
-		/* XXX Checksum is propably verified by host OS */
-
 		t->res[seq % NUM] = '.';
 		if (a_flag)
 			write(STDOUT_FILENO, "\a", 1);
 		stats->received++;
 	} else {
-		if (n < ICMP6ECHOLEN * 2 + sizeof(struct ip6_hdr))
+		/* Skip short icmp error packets. */
+		if (n < ICMP6_MINLEN * 2 + sizeof(struct ip6_hdr))
 			return;
 
 		/* Check aspects of the original packet */
@@ -340,7 +342,7 @@ write_packet6(int fd, short what, void *thunk)
 	struct icmp6_hdr *icmp6h;
 	int len;
 
-	len = ICMP6ECHOLEN + datalen;
+	len = ICMP6_MINLEN + datalen;
 	icmp6h = (struct icmp6_hdr *)outpacket6;
 	icmp6h->icmp6_type = ICMP6_ECHO_REQUEST;
 	icmp6h->icmp6_code = 0;
@@ -370,7 +372,7 @@ write_packet(int fd, short what, void *thunk)
 
 	if (sa(t)->sa_family == AF_INET6) {
 		n = write_packet6(fd6, what, thunk);
-		len = ICMP6ECHOLEN + datalen;
+		len = ICMP6_MINLEN + datalen;
 	} else {
 		n = write_packet4(fd4, what, thunk);
 		len = ICMP_MINLEN + datalen;
@@ -571,7 +573,7 @@ main(int argc, char *argv[])
 	ident = getpid() & 0xffff;
 	for (i=0; i<datalen; i++) {
 		outpacket[ICMP_MINLEN + i] = '0' + i;
-		outpacket6[ICMP6ECHOLEN + i] = '0' + i;
+		outpacket6[ICMP6_MINLEN + i] = '0' + i;
 	}
 
 	/* Prepare event system and inbound socket */
