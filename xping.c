@@ -199,7 +199,6 @@ read_packet4(int fd, short what, void *thunk)
 			return; /*  skip other ping sessions */
 		seq = ntohs(icp->icmp_seq);
 
-		/* Search for our target */
 		t = findtarget(AF_INET, &sin.sin_addr);
 		if (t == NULL)
 			return; /* reply from unknown src */
@@ -224,7 +223,6 @@ read_packet4(int fd, short what, void *thunk)
 			return;
 		seq = ntohs(oicp->icmp_seq);
 
-		/* Search for our target */
 		t = findtarget(AF_INET, &oip->ip_dst);
 		if (t == NULL)
 			return; /* original target is unknown */
@@ -272,7 +270,6 @@ read_packet6(int fd, short what, void *thunk)
 			return; /*  skip other ping sessions */
 		seq = ntohs(icmp6h->icmp6_seq);
 
-		/* Search for our target */
 		t = findtarget(AF_INET6, &sin6.sin6_addr);
 		if (t == NULL)
 			return; /* reply from unknown src */
@@ -300,7 +297,6 @@ read_packet6(int fd, short what, void *thunk)
 			return;
 		seq = ntohs(oicmp6h->icmp6_seq);
 
-		/* Search for our target */
 		t = findtarget(AF_INET6, &oip6->ip6_dst);
 		if (t == NULL)
 			return; /* original target is unknown */
@@ -498,9 +494,9 @@ usage(const char *whine)
 
 /*
  * Continiously probing multiple hosts using ICMP-ECHO. As packets are
- * received dots are printed on the screen. Host not responding before
- * next packet in due time will get a questionmark in the display. The
- * probing stops when SIGINT is received.
+ * received dots are printed on the screen. Hosts not responding before
+ * next packet is due will get a questionmark in the display. The probing
+ * stops when SIGINT is received.
  */
 int
 main(int argc, char *argv[])
