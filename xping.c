@@ -32,7 +32,6 @@
 #define VERSION "xping [compiled " __DATE__ " " __TIME__ "]"
 #endif /* !VERSION */
 
-
 /* Option flags */
 int	i_interval = 1000;
 int	a_flag = 0;
@@ -476,7 +475,7 @@ redraw()
 
 	move(0, 0);
 	clrtoeol();
-	mvprintw(0, col/2 - strlen(VERSION)/2, "%s", VERSION);
+	mvprintw(0, col/2 - (8+strlen(VERSION))/2, "xping [%s]", VERSION);
 
 	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
@@ -577,7 +576,8 @@ main(int argc, char *argv[])
 				usage("Dangerous interval");
 			break;
 		case 'V':
-			fprintf(stderr, "%s\n", VERSION);
+			fprintf(stderr, "%s compiled %s\n", "xping",
+			    VERSION);
 			return (0);
 		case 'h':
 			usage(NULL);

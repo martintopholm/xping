@@ -6,12 +6,12 @@
 .\" this stuff is worth it, you can buy me a beer in return Martin Topholm
 .\" ----------------------------------------------------------------------------
 .\"
-.Dd December 6, 2010
+.Dd August 25, 2012
 .Dt XPING 8
 .Os
 .Sh NAME
 .Nm xping
-.Nd Multiple target PINGer
+.Nd A terminal based, adhoc, multi target icmp-echo tool.
 .Sh SYNOPSIS
 .Nm
 .Op Fl 46AVh
@@ -53,8 +53,15 @@ as root.
 .Nm
 was written by
 .An Martin Topholm Aq mph@hoth.dk .
+.Pp
 .Nm
-uses libevent2 by Niels Provos <provos@citi.umich.edu> and Nick Mathewson.
+uses
+.Nm libevent2
+by An Niels Provos and Nick Mathewson,
+.Nm uthash
+by Troy D. Hanson, and
+.Nm queue.h
+from Regents of the University of California.
 .Sh BUGS
 .Nm
 is not very informative on errors.

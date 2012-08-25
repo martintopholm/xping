@@ -9,12 +9,9 @@ SBINPATH=$(PREFIX)/bin
 MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I./$(LIBEVENT) -I./$(LIBEVENT)/include
 LDFLAGS=-L./$(LIBEVENT)/.libs
-LIBS=-lcurses libevent.a -lrt
+LIBS=libevent.a -lrt -lcurses
 
 all: xping xping.8.gz
-
-ncurses-dev:
-	sudo aptitude install ncurses-dev
 
 libevent.a:
 	test -f $(LIBEVENT).tar.gz || wget https://github.com/downloads/libevent/libevent/$(LIBEVENT).tar.gz
@@ -23,8 +20,12 @@ libevent.a:
 	cp ./$(LIBEVENT)/.libs/libevent.a .
 	size libevent.a
 
-xping: libevent.a xping.o
-	gcc $(LDFLAGS) -g -o xping xping.o $(LIBS)
+curses.so:
+	printf "#include <ncurses.h>\nint main() { initscr(); return 0; }" | \
+            gcc -x c -o /dev/null - -lcurses && touch curses.so
+
+xping: libevent.a curses.so xping.o version.o
+	$(CC) $(LDFLAGS) -g -o xping xping.o version.o $(LIBS)
 
 xping.8.gz: xping.8
 	gzip < xping.8 > xping.8.gz
@@ -42,4 +43,4 @@ install:
 	install -m 444 xping.8.gz $(MANPATH)/man8/
 
 clean:
-	rm -f xping xping.o xping.8.gz xping.8.txt xping.8.html
+	rm -f xping xping.o xping.8.gz xping.8.txt xping.8.html version.o curses.so
