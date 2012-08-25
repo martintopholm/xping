@@ -99,7 +99,7 @@ static u_short in_cksum(u_short *, int);
  * key already exists.
  */
 void
-newtarget(struct target * t)
+newtarget(struct target *t)
 {
 	struct target *result;
 
@@ -125,7 +125,7 @@ findtarget(int af, void *address)
 		memmove(&sa.sin.sin_addr, (struct in_addr *)address,
 		    sizeof(sa.sin.sin_addr));
 	} else if (af == AF_INET6) {
-		sa.sin6.sin6_family = AF_INET;
+		sa.sin6.sin6_family = AF_INET6;
 		memmove(&sa.sin6.sin6_addr, (struct in6_addr *)address,
 		    sizeof(sa.sin6.sin6_addr));
 	} else {
@@ -381,8 +381,10 @@ write_packet(int fd, short what, void *thunk)
 	int len;
 	int n;
 
-	if (t->duplicate != NULL)
+	if (t->duplicate != NULL) {
+		t->npkts++;
 		return;
+	}
 
 	if (t->npkts > 0 && GETRES(t, -1) == ' ') {
 		SETRES(t, -1, '?');
@@ -481,11 +483,13 @@ redraw()
 		mvprintw(y, 0, "%19.19s ", t->host);
 		if (t->duplicate != NULL)
 			mvprintw(y, 20, "(duplicate of %s)", t->duplicate->host);
-		for (i=ifirst; i<ilast; i++) {
-			if (i < t->npkts)
-				addch(t->res[i % NUM]);
-			else
-				addch(' ');
+		else {
+			for (i=ifirst; i<ilast; i++) {
+				if (i < t->npkts)
+					addch(t->res[i % NUM]);
+				else
+					addch(' ');
+			}
 		}
 		y++;
 	}
