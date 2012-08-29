@@ -26,6 +26,7 @@
 #include <ncurses.h>
 
 #include "queue.h"
+#include "uthash.h"
 
 #ifndef VERSION
 #define VERSION "xping [compiled " __DATE__ " " __TIME__ "]"
@@ -61,6 +62,7 @@ union addr {
 };
 
 SLIST_HEAD(slisthead, target) head = SLIST_HEAD_INITIALIZER(head);
+struct target *hash = NULL;
 struct target {
 	char		host[64];
 	int		resolved;
@@ -70,7 +72,9 @@ struct target {
 	int		npkts;
 	char		res[NUM+1];
 
+	struct target	*duplicate;
 	SLIST_ENTRY(target) entries;
+	UT_hash_handle	hh;
 };
 
 struct statistics {
@@ -90,30 +94,45 @@ static u_short in_cksum(u_short *, int);
 #define sin(x) ((struct sockaddr_in *)(&x->sa))
 #define sin6(x) ((struct sockaddr_in6 *)(&x->sa))
 
-struct target *findtarget(int af, void *address)
+/*
+ * Insert a new target into the hash table. Mark as a duplicate if the
+ * key already exists.
+ */
+void
+newtarget(struct target * t)
 {
-	struct target *t;
+	struct target *result;
 
+	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
+	if (result)
+		t->duplicate = result;
+	else
+		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
+}
+
+/*
+ * Lookup target in the hash table
+ */
+struct target *
+findtarget(int af, void *address)
+{
+	struct target *result;
+	union addr sa;
+
+	memset(&sa, 0, sizeof(sa));
 	if (af == AF_INET) {
-		SLIST_FOREACH(t, &head, entries) {
-			if (sa(t)->sa_family == AF_INET &&
-			    memcmp(&sin(t)->sin_addr,
-			    (struct in_addr *)address,
-			    sizeof(sin(t)->sin_addr)) == 0)
-				break;
-		}
+		sa.sin.sin_family = AF_INET;
+		memmove(&sa.sin.sin_addr, (struct in_addr *)address,
+		    sizeof(sa.sin.sin_addr));
 	} else if (af == AF_INET6) {
-		SLIST_FOREACH(t, &head, entries) {
-			if (sa(t)->sa_family == AF_INET6 &&
-			    memcmp(&sin6(t)->sin6_addr,
-			    (struct in6_addr *)address,
-			    sizeof(sin6(t)->sin6_addr)) == 0)
-				break;
-		}
+		sa.sin6.sin6_family = AF_INET;
+		memmove(&sa.sin6.sin6_addr, (struct in6_addr *)address,
+		    sizeof(sa.sin6.sin6_addr));
 	} else {
 		return NULL;
 	}
-	return (t);
+	HASH_FIND(hh, hash, &sa, sizeof(union addr), result);
+	return (result);
 }
 
 /*
@@ -151,11 +170,13 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
 		    sizeof(sin6(t)->sin6_addr));
 		t->resolved = 1;
+		newtarget(t);
 	} else if (type == DNS_IPv4_A && count > 0) {
 		sin(t)->sin_family = AF_INET;
 		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
 		    sizeof(sin(t)->sin_addr));
 		t->resolved = 1;
+		newtarget(t);
 	}
 }
 
@@ -360,6 +381,9 @@ write_packet(int fd, short what, void *thunk)
 	int len;
 	int n;
 
+	if (t->duplicate != NULL)
+		return;
+
 	if (t->npkts > 0 && GETRES(t, -1) == ' ') {
 		SETRES(t, -1, '?');
 		if (A_flag)
@@ -455,6 +479,8 @@ redraw()
 	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
 		mvprintw(y, 0, "%19.19s ", t->host);
+		if (t->duplicate != NULL)
+			mvprintw(y, 20, "(duplicate of %s)", t->duplicate->host);
 		for (i=ifirst; i<ilast; i++) {
 			if (i < t->npkts)
 				addch(t->res[i % NUM]);
@@ -594,6 +620,7 @@ main(int argc, char *argv[])
 		salen = sizeof(t->sa);
 		if (evutil_parse_sockaddr_port(t->host, sa(t), &salen) == 0) {
 			t->resolved = 1;
+			newtarget(t);
 		} else {
 			if (v4_flag) {
 				t->evdns_type = DNS_IPv4_A;
