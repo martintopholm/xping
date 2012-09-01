@@ -10,6 +10,10 @@ MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I./$(LIBEVENT) -I./$(LIBEVENT)/include
 LDFLAGS=-L./$(LIBEVENT)/.libs
 LIBS=libevent.a -lrt -lcurses
+VERSION="1.0"
+TIMESTAMP="`date +%Y%m%dT%H%M%S`"
+
+.PHONY: version.o
 
 all: xping xping.8.gz
 
@@ -23,6 +27,11 @@ libevent.a:
 curses.so:
 	printf "#include <ncurses.h>\nint main() { initscr(); return 0; }" | \
             gcc -x c -o /dev/null - -lcurses && touch curses.so
+
+version.o:
+	(printf "const char version[] = \"%s\";\n" $(VERSION); \
+	 printf "const char built[] = \"%s\";\n" $(TIMESTAMP)) | \
+	 gcc -x c -c -o version.o -
 
 xping: libevent.a curses.so xping.o version.o
 	$(CC) $(LDFLAGS) -g -o xping xping.o version.o $(LIBS)

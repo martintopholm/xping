@@ -28,9 +28,8 @@
 #include "queue.h"
 #include "uthash.h"
 
-#ifndef VERSION
-#define VERSION "xping [compiled " __DATE__ " " __TIME__ "]"
-#endif /* !VERSION */
+extern const char version[];
+extern const char built[];
 
 /* Option flags */
 int	i_interval = 1000;
@@ -475,7 +474,8 @@ redraw()
 
 	move(0, 0);
 	clrtoeol();
-	mvprintw(0, col/2 - (8+strlen(VERSION))/2, "xping [%s]", VERSION);
+	mvprintw(0, col/2 - (9+strlen(version)+strlen(built))/2,
+	    "xping [v%s]", version);
 
 	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
@@ -576,8 +576,8 @@ main(int argc, char *argv[])
 				usage("Dangerous interval");
 			break;
 		case 'V':
-			fprintf(stderr, "%s compiled %s\n", "xping",
-			    VERSION);
+			fprintf(stderr, "%s version %s (built %s)\n", "xping",
+			    version, built);
 			return (0);
 		case 'h':
 			usage(NULL);
