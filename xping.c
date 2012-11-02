@@ -251,6 +251,8 @@ read_packet4(int fd, short what, void *thunk)
 		} else {
 			t->res[seq % NUM] = '%';
 		}
+		if (A_flag)
+			write(STDOUT_FILENO, "\a", 1);
 		stats->other++;
 	}
 	redraw();
