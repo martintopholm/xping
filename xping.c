@@ -9,7 +9,6 @@
 
 #include <sys/param.h>
 
-#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
@@ -23,13 +22,8 @@
 
 #include <event2/event.h>
 #include <event2/dns.h>
-#include <ncurses.h>
 
-#include "queue.h"
-#include "uthash.h"
-
-extern const char version[];
-extern const char built[];
+#include "xping.h"
 
 /* Option flags */
 int	i_interval = 1000;
@@ -48,49 +42,17 @@ char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
 int	ident;
 
-#define ICMP6_MINLEN sizeof(struct icmp6_hdr)
-#define NUM 300
+struct target *hash = NULL;
+struct slisthead head = SLIST_HEAD_INITIALIZER(head);
+
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 
-union addr {
-	struct sockaddr	sa;
-	struct sockaddr_in sin;
-	struct sockaddr_in6 sin6;
-};
-
-SLIST_HEAD(slisthead, target) head = SLIST_HEAD_INITIALIZER(head);
-struct target *hash = NULL;
-struct target {
-	char		host[64];
-	int		resolved;
-	int		evdns_type;
-
-	union addr	sa;
-	int		npkts;
-	char		res[NUM+1];
-
-	struct target	*duplicate;
-	SLIST_ENTRY(target) entries;
-	UT_hash_handle	hh;
-};
-
-struct statistics {
-	int		transmitted;
-	int		received;
-
-	int		sendto_err;
-	int		recvfrom_err;
-	int		runt;
-	int		other;
-} statistics, *stats;
-
-static void redraw();
 static u_short in_cksum(u_short *, int);
 
-#define sa(x) ((struct sockaddr *)(&x->sa))
-#define sin(x) ((struct sockaddr_in *)(&x->sa))
-#define sin6(x) ((struct sockaddr_in6 *)(&x->sa))
+void (*init)(void) = termio_init;
+void (*update)(void) = termio_update;
+void (*cleanup)(void) = termio_cleanup;
 
 /*
  * Insert a new target into the hash table. Mark as a duplicate if the
@@ -253,7 +215,7 @@ read_packet4(int fd, short what, void *thunk)
 		}
 		stats->other++;
 	}
-	redraw();
+	update();
 }
 
 void
@@ -327,7 +289,7 @@ read_packet6(int fd, short what, void *thunk)
 		stats->other++;
 	}
 
-	redraw();
+	update();
 }
 
 int
@@ -409,7 +371,7 @@ write_packet(int fd, short what, void *thunk)
 	}
 	stats->transmitted++;
 	t->npkts++;
-	redraw();
+	update();
 }
 
 /*
@@ -435,7 +397,7 @@ write_first_packet(int fd, short what, void *thunk)
 		}
 		SETRES(t, 0, '@');
 		t->npkts++;
-		redraw();
+		update();
 		return;
 	}
 
@@ -448,66 +410,6 @@ write_first_packet(int fd, short what, void *thunk)
 		ev = event_new(ev_base, fd4, EV_PERSIST, write_packet, t);
 	}
 	event_add(ev, &tv);
-}
-
-/*
- * Draws the recorded replies on the terminal.
- */
-void
-redraw()
-{
-	struct target *t;
-	int col;
-	int y;
-
-	int i, imax, ifirst, ilast;
-
-	t = SLIST_FIRST(&head);
-	if (t == NULL)
-		return;
-
-	col = getmaxx(stdscr);
-	imax = MIN(t->npkts, col - 20);
-	imax = MIN(imax, NUM);
-	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
-	ilast = t->npkts;
-
-	move(0, 0);
-	clrtoeol();
-	mvprintw(0, col/2 - (8+strlen(version)+strlen(built))/2,
-	    "xping [%s]", version);
-
-	y = 2;
-	SLIST_FOREACH(t, &head, entries) {
-		mvprintw(y, 0, "%19.19s ", t->host);
-		if (t->duplicate != NULL)
-			mvprintw(y, 20, "(duplicate of %s)", t->duplicate->host);
-		else {
-			for (i=ifirst; i<ilast; i++) {
-				if (i < t->npkts)
-					addch(t->res[i % NUM]);
-				else
-					addch(' ');
-			}
-		}
-		y++;
-	}
-
-	y++;
-	mvprintw(y++, 0, "Sent: %d", stats->transmitted);
-	mvprintw(y++, 0, "Recv: %d", stats->received);
-	mvprintw(y++, 0, "ErrO: %d", stats->sendto_err);
-	mvprintw(y++, 0, "ErrI: %d", stats->recvfrom_err);
-	mvprintw(y++, 0, "Runt: %d", stats->runt);
-	mvprintw(y++, 0, "Othr: %d", stats->other);
-	y++;
-	mvprintw(y++, 0, "Legend  . echo-reply   ? timeout      # unreach   "
-	    "%% other");
-	mvprintw(y++, 0, "        @ resolving    ! send-error");
-
-	move(y++, 0);
-
-	refresh();
 }
 
 void
@@ -653,9 +555,9 @@ main(int argc, char *argv[])
 		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
 	}
 
-	initscr();
+	init();
 	event_base_dispatch(ev_base);
-	endwin();
+	cleanup();
 
 	close(fd4);
 	close(fd6);
