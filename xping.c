@@ -597,7 +597,7 @@ main(int argc, char *argv[])
 
 	/* Prepare statistics and datapacket */
 	stats = &statistics;
-	memset(stats, 0, sizeof(stats));
+	memset(stats, 0, sizeof(*stats));
 	ident = getpid() & 0xffff;
 	for (i=0; i<datalen; i++) {
 		outpacket[ICMP_MINLEN + i] = '0' + i;
