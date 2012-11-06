@@ -38,22 +38,40 @@ getmaxx(void)
 		return 0;
 }
 
+int
+getmaxy(void)
+{
+	struct winsize wsz;
+	char *p;
+
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) != -1 &&
+	    wsz.ws_row > 0)
+		return (wsz.ws_row);
+	else if ((p = getenv("ROWS")) != NULL && *p != '\0')
+		return atoi(p);
+	else
+		return 0;
+}
 void
 move(int row, int col)
 {
-	fprintf(stdout, "[%d;%dH", row+1, col);
+	fprintf(stdout, "%c[u", 0x1b);
+	if (row > 0)
+		fprintf(stdout, "%c[%dB", 0x1b, row);
+	if (col > 0)
+		fprintf(stdout, "%c[%dC", 0x1b, col);
 }
 
 static void
 clrtobot(void)
 {
-	fprintf(stdout, "[J");
+	fprintf(stdout, "%c[J", 0x1b);
 }
 
 static void
 clrtoeol(void)
 {
-	fprintf(stdout, "[K");
+	fprintf(stdout, "%c[K", 0x1b);
 }
 
 static void
@@ -68,7 +86,7 @@ mvprintw(int row, int col, const char *fmt, ...)
 	va_list ap;
 
 	move(row, col);
-	fprintf(stdout, "[K");
+	fprintf(stdout, "%c[K", 0x1b);
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
@@ -88,7 +106,12 @@ void
 termio_init(void)
 {
 #ifndef NCURSES
-	move(0, 0);
+	int y;
+	y = getmaxy();
+	for (y = getmaxy(); y > 0; y--)
+		fprintf(stdout, "%cD", 0x1b);
+	fprintf(stdout, "%c[H", 0x1b);
+	fprintf(stdout, "%c[s", 0x1b);
 	clrtobot();
 #else /* NCURSES */
 	initscr();

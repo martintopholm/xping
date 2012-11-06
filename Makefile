@@ -13,6 +13,9 @@ LIBS=libevent.a -lrt
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
+#CFLAGS+=-DNCURSES
+#LIBS+=-lcurses
+
 .PHONY: version.o
 
 all: xping xping.8.gz
