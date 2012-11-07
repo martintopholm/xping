@@ -504,7 +504,7 @@ redraw()
 	mvprintw(y++, 0, "Othr: %d", stats->other);
 	y++;
 	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach "
-	    "%=other");
+	    "%%=other");
 	mvprintw(y++, 0, "       send: @=resolving !=partial $=other");
 	move(y++, 0);
 
