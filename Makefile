@@ -10,7 +10,7 @@ MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I./$(LIBEVENT) -I./$(LIBEVENT)/include
 LDFLAGS=-L./$(LIBEVENT)/.libs
 LIBS=libevent.a -lrt -lcurses
-VERSION="1.0"
+VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 .PHONY: version.o

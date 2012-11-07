@@ -474,8 +474,8 @@ redraw()
 
 	move(0, 0);
 	clrtoeol();
-	mvprintw(0, col/2 - (9+strlen(version)+strlen(built))/2,
-	    "xping [v%s]", version);
+	mvprintw(0, col/2 - (8+strlen(version)+strlen(built))/2,
+	    "xping [%s]", version);
 
 	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
@@ -576,7 +576,7 @@ main(int argc, char *argv[])
 				usage("Dangerous interval");
 			break;
 		case 'V':
-			fprintf(stderr, "%s version %s (built %s)\n", "xping",
+			fprintf(stderr, "%s %s (built %s)\n", "xping",
 			    version, built);
 			return (0);
 		case 'h':
