@@ -251,8 +251,6 @@ read_packet4(int fd, short what, void *thunk)
 		} else {
 			t->res[seq % NUM] = '%';
 		}
-		if (A_flag)
-			write(STDOUT_FILENO, "\a", 1);
 		stats->other++;
 	}
 	redraw();
@@ -326,8 +324,6 @@ read_packet6(int fd, short what, void *thunk)
 			t->res[seq % NUM] = '#';
 		else
 			t->res[seq % NUM] = '%';
-		if (A_flag)
-			write(STDOUT_FILENO, "\a", 1);
 		stats->other++;
 	}
 
@@ -388,8 +384,9 @@ write_packet(int fd, short what, void *thunk)
 		return;
 	}
 
-	if (t->npkts > 0 && GETRES(t, -1) == ' ') {
-		SETRES(t, -1, '?');
+	if (t->npkts > 0 && GETRES(t, -1) != '.') {
+		if (GETRES(t, -1) == ' ')
+			SETRES(t, -1, '?');
 		if (A_flag)
 			write(STDOUT_FILENO, "\a", 1);
 	}
