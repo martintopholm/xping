@@ -96,6 +96,23 @@ findtarget(int af, void *address)
 }
 
 /*
+ * Mark a target and sequence with given symbol
+ */
+void
+marktarget(int af, void *address, int seq, int ch)
+{
+	struct target *t;
+
+	t = findtarget(af, address);
+	if (t == NULL)
+		return; /* reply from unknown src */
+
+	t->res[seq % NUM] = ch;
+	if (a_flag && ch == '.')
+		write(STDOUT_FILENO, "\a", 1);
+}
+
+/*
  * Callback for resolved domain names. On missing AAAA-record retry for
  * A-record instead.
  */
@@ -143,7 +160,6 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 void
 read_packet4(int fd, short what, void *thunk)
 {
-	struct target *t;
 	char inpacket[IP_MAXPACKET];
 	struct sockaddr_in sin;
 	struct ip *ip;
@@ -178,15 +194,9 @@ read_packet4(int fd, short what, void *thunk)
 	if (icp->icmp_type == ICMP_ECHOREPLY) {
 		if (icp->icmp_id != htons(ident))
 			return; /*  skip other ping sessions */
+
 		seq = ntohs(icp->icmp_seq);
-
-		t = findtarget(AF_INET, &sin.sin_addr);
-		if (t == NULL)
-			return; /* reply from unknown src */
-
-		t->res[seq % NUM] = '.';
-		if (a_flag)
-			write(STDOUT_FILENO, "\a", 1);
+		marktarget(AF_INET, &sin.sin_addr, seq, '.');
 		stats->received++;
 	} else {
 		/* Skip short icmp error packets. */
@@ -202,17 +212,12 @@ read_packet4(int fd, short what, void *thunk)
 			return;
 		if (oicp->icmp_id != htons(ident))
 			return;
+
 		seq = ntohs(oicp->icmp_seq);
-
-		t = findtarget(AF_INET, &oip->ip_dst);
-		if (t == NULL)
-			return; /* original target is unknown */
-
-		if (icp->icmp_type == ICMP_UNREACH) {
-			t->res[seq % NUM] = '#';
-		} else {
-			t->res[seq % NUM] = '%';
-		}
+		if (icp->icmp_type == ICMP_UNREACH)
+			marktarget(AF_INET, &oip->ip_dst, seq, '#');
+		else
+			marktarget(AF_INET, &oip->ip_dst, seq, '%');
 		stats->other++;
 	}
 	update();
@@ -221,7 +226,6 @@ read_packet4(int fd, short what, void *thunk)
 void
 read_packet6(int fd, short what, void *thunk)
 {
-	struct target *t = thunk;
 	char inpacket[IP_MAXPACKET];
 	struct sockaddr_in6 sin6;
 	struct ip6_hdr *oip6;
@@ -249,18 +253,11 @@ read_packet6(int fd, short what, void *thunk)
 	if (icmp6h->icmp6_type == ICMP6_ECHO_REPLY) {
 		if (icmp6h->icmp6_id != htons(ident))
 			return; /*  skip other ping sessions */
-		seq = ntohs(icmp6h->icmp6_seq);
-
-		t = findtarget(AF_INET6, &sin6.sin6_addr);
-		if (t == NULL)
-			return; /* reply from unknown src */
-
 		if (n != sizeof(struct icmp6_hdr) + datalen)
 			return;
 
-		t->res[seq % NUM] = '.';
-		if (a_flag)
-			write(STDOUT_FILENO, "\a", 1);
+		seq = ntohs(icmp6h->icmp6_seq);
+		marktarget(AF_INET6, &sin6.sin6_addr, seq, '.');
 		stats->received++;
 	} else {
 		/* Skip short icmp error packets. */
@@ -276,16 +273,12 @@ read_packet6(int fd, short what, void *thunk)
 			return;
 		if (oicmp6h->icmp6_id != htons(ident))
 			return;
+
 		seq = ntohs(oicmp6h->icmp6_seq);
-
-		t = findtarget(AF_INET6, &oip6->ip6_dst);
-		if (t == NULL)
-			return; /* original target is unknown */
-
 		if (icmp6h->icmp6_type == ICMP6_DST_UNREACH)
-			t->res[seq % NUM] = '#';
+			marktarget(AF_INET6, &oip6->ip6_dst, seq, '#');
 		else
-			t->res[seq % NUM] = '%';
+			marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
 		stats->other++;
 	}
 
