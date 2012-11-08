@@ -326,6 +326,8 @@ read_packet6(int fd, short what, void *thunk)
 			t->res[seq % NUM] = '#';
 		else
 			t->res[seq % NUM] = '%';
+		if (A_flag)
+			write(STDOUT_FILENO, "\a", 1);
 		stats->other++;
 	}
 
