@@ -108,8 +108,16 @@ marktarget(int af, void *address, int seq, int ch)
 		return; /* reply from unknown src */
 
 	t->res[seq % NUM] = ch;
-	if (a_flag && ch == '.')
-		write(STDOUT_FILENO, "\a", 1);
+	if (a_flag && ch == '.') {
+		if (a_flag == 1)
+			write(STDOUT_FILENO, "\a", 1);
+		else if (a_flag >=2 &&
+		    t->res[(seq-3) % NUM] != '.' &&
+		    t->res[(seq-2) % NUM] != '.' &&
+		    t->res[(seq-1) % NUM] == '.' &&
+		    t->res[(seq-0) % NUM] == '.')
+			write(STDOUT_FILENO, "\a", 1);
+	}
 }
 
 /*
@@ -342,7 +350,13 @@ write_packet(int fd, short what, void *thunk)
 	if (t->npkts > 0 && GETRES(t, -1) != '.') {
 		if (GETRES(t, -1) == ' ')
 			SETRES(t, -1, '?');
-		if (A_flag)
+		if (A_flag == 1)
+			write(STDOUT_FILENO, "\a", 1);
+		else if (A_flag >= 2 &&
+		    GETRES(t, -4) == '.' &&
+		    GETRES(t, -3) == '.' &&
+		    GETRES(t, -2) != '.' &&
+		    GETRES(t, -1) != '.')
 			write(STDOUT_FILENO, "\a", 1);
 	}
 
@@ -459,10 +473,10 @@ main(int argc, char *argv[])
 			v6_flag = 1;
 			break;
 		case 'a':
-			a_flag = 1;
+			a_flag++;
 			break;
 		case 'A':
-			A_flag = 1;
+			A_flag++;
 			break;
 		case 'i':
 			i_interval = strtod(optarg, &end) * 1000;

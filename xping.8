@@ -6,7 +6,7 @@
 .\" this stuff is worth it, you can buy me a beer in return Martin Topholm
 .\" ----------------------------------------------------------------------------
 .\"
-.Dd August 25, 2012
+.Dd November 9, 2012
 .Dt XPING 8
 .Os
 .Sh NAME
@@ -14,7 +14,7 @@
 .Nd A terminal based, adhoc, multi target icmp-echo tool.
 .Sh SYNOPSIS
 .Nm
-.Op Fl 46AVh
+.Op Fl 46AVah
 .Op Fl i Ar interval
 .Op Ar host Op ...
 .Sh DESCRIPTION
@@ -31,11 +31,15 @@ Force xping to resolve IPv4 address only.
 .It Fl 6
 Force xping to resolve IPv6 address only.
 .It Fl A
-Print a bell character on stdout when a packet is missed.
+Print a bell character on stdout when a packet is missed within
+.Ar interval .
+If given multiple times only print bell if host goes from a responsive
+state to unresponsive state (e.g. ..??).
 .It Fl V
 Print the "version" of xping and exit.
 .It Fl a
-Print a bell character on stdout on replies.
+Print a bell character on stdout on replies. If given multiple times
+only print bell if host goes from unresponsive to responsive (e.g. ??..).
 .It Fl h
 Display program usage and exit.
 .It Fl i Ar interval
@@ -52,12 +56,12 @@ as root.
 .Sh AUTHORS
 .Nm
 was written by
-.An Martin Topholm Aq mph@hoth.dk .
+.An Martin Topholm .
 .Pp
 .Nm
 uses
 .Nm libevent2
-by An Niels Provos and Nick Mathewson,
+by Niels Provos and Nick Mathewson,
 .Nm uthash
 by Troy D. Hanson, and
 .Nm queue.h

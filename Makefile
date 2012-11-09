@@ -36,7 +36,7 @@ xping: libevent.a xping.o termio.o version.o
 	$(CC) $(LDFLAGS) -g -o xping xping.o termio.o version.o $(LIBS)
 
 xping.8.gz: xping.8
-	gzip < xping.8 > xping.8.gz
+	gzip -c xping.8 > xping.8.gz
 
 install:
 	mkdir -p $(SBINPATH)
