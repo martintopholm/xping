@@ -147,7 +147,14 @@ termio_update(void)
 
 	y = 2;
 	SLIST_FOREACH(t, &head, entries) {
-		mvprintw(y, 0, "%19.19s ", t->host);
+		if (C_flag && t->evdns_type && sa(t)->sa_family == AF_INET6)
+			mvprintw(y, 0, "%c[2;32m%19.19s%c[0m ",
+			    0x1b, t->host, 0x1b);
+		else if (C_flag && t->evdns_type && sa(t)->sa_family == AF_INET)
+			mvprintw(y, 0, "%c[2;31m%19.19s%c[0m ",
+			    0x1b, t->host, 0x1b);
+		else
+			mvprintw(y, 0, "%19.19s ", t->host);
 		if (t->duplicate != NULL)
 			mvprintw(y, 20, "(duplicate of %s)", t->duplicate->host);
 		else {
@@ -172,6 +179,9 @@ termio_update(void)
 	mvprintw(y++, 0, "Legend  . echo-reply   ? timeout      # unreach    "
 	    "%%=other");
 	mvprintw(y++, 0, "        @ resolving    ! send-error");
+	if (C_flag)
+		mvprintw(y-1, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
+		    0x1b, 0x1b, 0x1b, 0x1b);
 	move(y++, 0);
 	clrtobot();
 

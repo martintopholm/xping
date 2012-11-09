@@ -11,6 +11,7 @@
 #define NUM 300
 
 extern SLIST_HEAD(slisthead, target) head;
+extern int C_flag;
 
 union addr {
 	struct sockaddr sa;

@@ -29,6 +29,7 @@
 int	i_interval = 1000;
 int	a_flag = 0;
 int	A_flag = 0;
+int	C_flag = 0;
 int	v4_flag = 0;
 int	v6_flag = 0;
 
@@ -462,7 +463,7 @@ main(int argc, char *argv[])
 	}
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46Aai:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ACai:hV")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
@@ -477,6 +478,9 @@ main(int argc, char *argv[])
 			break;
 		case 'A':
 			A_flag++;
+			break;
+		case 'C':
+			C_flag = 1;
 			break;
 		case 'i':
 			i_interval = strtod(optarg, &end) * 1000;

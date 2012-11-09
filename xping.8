@@ -32,9 +32,11 @@ Force xping to resolve IPv4 address only.
 Force xping to resolve IPv6 address only.
 .It Fl A
 Print a bell character on stdout when a packet is missed within
-.Ar interval .
 If given multiple times only print bell if host goes from a responsive
 state to unresponsive state (e.g. ..??).
+.Ar interval .
+.It Fl C
+Color resolved hostname according to address family.
 .It Fl V
 Print the "version" of xping and exit.
 .It Fl a
