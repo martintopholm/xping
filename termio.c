@@ -169,19 +169,21 @@ termio_update(void)
 	}
 
 	y++;
-	mvprintw(y++, 0, "Sent: %d", stats->transmitted);
-	mvprintw(y++, 0, "Recv: %d", stats->received);
-	mvprintw(y++, 0, "ErrO: %d", stats->sendto_err);
-	mvprintw(y++, 0, "ErrI: %d", stats->recvfrom_err);
-	mvprintw(y++, 0, "Runt: %d", stats->runt);
-	mvprintw(y++, 0, "Othr: %d", stats->other);
-	y++;
 	mvprintw(y++, 0, "Legend  . echo-reply   ? timeout      # unreach    "
 	    "%%=other");
 	mvprintw(y++, 0, "        @ resolving    ! send-error");
 	if (C_flag)
 		mvprintw(y-1, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
 		    0x1b, 0x1b, 0x1b, 0x1b);
+#ifdef STATS
+	y++;
+	mvprintw(y++, 0, "Sent: %d", stats->transmitted);
+	mvprintw(y++, 0, "Recv: %d", stats->received);
+	mvprintw(y++, 0, "ErrO: %d", stats->sendto_err);
+	mvprintw(y++, 0, "ErrI: %d", stats->recvfrom_err);
+	mvprintw(y++, 0, "Runt: %d", stats->runt);
+	mvprintw(y++, 0, "Othr: %d", stats->other);
+#endif /* STATS */
 	move(y++, 0);
 	clrtobot();
 
