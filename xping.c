@@ -405,11 +405,10 @@ write_packet(int fd, short what, void *thunk)
 
 	if (n < 0) {
 		stats->sendto_err++;
-		SETRES(t, 0, '$'); /* transmit error */
-	}
-	if (n != len) {
+		SETRES(t, 0, '!'); /* transmit error */
+	} else if (n != len) {
 		stats->sendto_err++;
-		SETRES(t, 0, '!'); /* partial transmit */
+		SETRES(t, 0, '$'); /* partial transmit */
 	}
 	stats->transmitted++;
 	t->npkts++;
@@ -505,9 +504,10 @@ redraw()
 	mvprintw(y++, 0, "Runt: %d", stats->runt);
 	mvprintw(y++, 0, "Othr: %d", stats->other);
 	y++;
-	mvprintw(y++, 0, "Legend recv: .=echoreply ?=noreply #=unreach "
-	    "%%=other");
-	mvprintw(y++, 0, "       send: @=resolving !=partial $=other");
+	mvprintw(y++, 0, "Legend  . echo-reply   ? timeout      # unreach   "
+	    "%% other");
+	mvprintw(y++, 0, "        @ resolving    ! send-error");
+
 	move(y++, 0);
 
 	refresh();
