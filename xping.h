@@ -10,7 +10,7 @@
 #define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 #define NUM 300
 
-extern SLIST_HEAD(slisthead, target) head;
+extern STAILQ_HEAD(stailqhead, target) head;
 extern int C_flag;
 
 union addr {
@@ -29,7 +29,7 @@ struct target {
 	char		res[NUM+1];
 
 	struct target	*duplicate;
-	SLIST_ENTRY(target) entries;
+	STAILQ_ENTRY(target) entries;
 	UT_hash_handle	hh;
 };
 

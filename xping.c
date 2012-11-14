@@ -44,7 +44,7 @@ int	datalen = 56;
 int	ident;
 
 struct target *hash = NULL;
-struct slisthead head = SLIST_HEAD_INITIALIZER(head);
+struct stailqhead head = STAILQ_HEAD_INITIALIZER(head);
 
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
@@ -438,7 +438,7 @@ newtarget(const char *hostname)
 	memset(t, 0, sizeof(*t));
 	memset(t->res, ' ', sizeof(t->res));
 	strncat(t->host, hostname, sizeof(t->host) - 1);
-	SLIST_INSERT_HEAD(&head, t, entries);
+	STAILQ_INSERT_TAIL(&head, t, entries);
 
 	salen = sizeof(t->sa);
 	if (evutil_parse_sockaddr_port(t->host, sa(t), &salen) == 0) {
@@ -467,7 +467,7 @@ schedtargets(void)
 
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
-	SLIST_FOREACH(t, &head, entries) {
+	STAILQ_FOREACH(t, &head, entries) {
 		if (sa(t)->sa_family == AF_INET6) {
 			ev = event_new(ev_base, fd6, 0, write_first_packet, t);
 		} else {
@@ -582,8 +582,14 @@ main(int argc, char *argv[])
 	ev = event_new(ev_base, fd6, EV_READ|EV_PERSIST, read_packet6, NULL);
 	event_add(ev, NULL);
 
-	/* Read targets from stdin and/or program arguments. */
-	SLIST_INIT(&head);
+	/* Read targets from program arguments and/or stdin. */
+	STAILQ_INIT(&head);
+	for (i=0; i<argc; i++) {
+		if (newtarget(argv[i]) == NULL) {
+			perror("malloc");
+			return 1;
+		}
+	}
 	if (!isatty(STDIN_FILENO) || argc < 1) {
 		while(fgets(buf, sizeof(buf), stdin) != NULL) {
 			for (len = strlen(buf) - 1; len > 0; len--) {
@@ -598,13 +604,7 @@ main(int argc, char *argv[])
 			}
 		}
 	}
-	for (i=argc-1; i>=0; i--) {
-		if (newtarget(argv[i]) == NULL) {
-			perror("malloc");
-			return 1;
-		}
-	}
-	if (SLIST_EMPTY(&head)) {
+	if (STAILQ_EMPTY(&head)) {
 		usage("no arguments");
 	}
 	schedtargets();

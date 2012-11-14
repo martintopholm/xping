@@ -130,7 +130,7 @@ termio_update(void)
 
 	int i, imax, ifirst, ilast;
 
-	t = SLIST_FIRST(&head);
+	t = STAILQ_FIRST(&head);
 	if (t == NULL)
 		return;
 
@@ -146,7 +146,7 @@ termio_update(void)
 	    "xping [%s]", version);
 
 	y = 2;
-	SLIST_FOREACH(t, &head, entries) {
+	STAILQ_FOREACH(t, &head, entries) {
 		if (C_flag && t->evdns_type && sa(t)->sa_family == AF_INET6)
 			mvprintw(y, 0, "%c[2;32m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
