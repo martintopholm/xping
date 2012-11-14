@@ -49,6 +49,7 @@ struct slisthead head = SLIST_HEAD_INITIALIZER(head);
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 
+void resolved_host(int, char, int, int, void *, void *);
 static u_short in_cksum(u_short *, int);
 
 void (*init)(void) = termio_init;
@@ -60,7 +61,7 @@ void (*cleanup)(void) = termio_cleanup;
  * key already exists.
  */
 void
-newtarget(struct target *t)
+activatetarget(struct target *t)
 {
 	struct target *result;
 
@@ -156,13 +157,13 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
 		    sizeof(sin6(t)->sin6_addr));
 		t->resolved = 1;
-		newtarget(t);
+		activatetarget(t);
 	} else if (type == DNS_IPv4_A && count > 0) {
 		sin(t)->sin_family = AF_INET;
 		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
 		    sizeof(sin(t)->sin_addr));
 		t->resolved = 1;
-		newtarget(t);
+		activatetarget(t);
 	}
 }
 
@@ -420,6 +421,42 @@ write_first_packet(int fd, short what, void *thunk)
 	event_add(ev, &tv);
 }
 
+/*
+ * Allocate structure for a new target and insert into list of all
+ * our targets.
+ */
+struct target *
+newtarget(const char *hostname)
+{
+	struct target * t;
+	int salen;
+
+	t = malloc(sizeof(*t));
+	if (t == NULL)
+		return (t);
+	memset(t, 0, sizeof(*t));
+	memset(t->res, ' ', sizeof(t->res));
+	strncat(t->host, hostname, sizeof(t->host) - 1);
+	SLIST_INSERT_HEAD(&head, t, entries);
+
+	salen = sizeof(t->sa);
+	if (evutil_parse_sockaddr_port(t->host, sa(t), &salen) == 0) {
+		t->resolved = 1;
+		activatetarget(t);
+	} else {
+		if (v4_flag) {
+			t->evdns_type = DNS_IPv4_A;
+			evdns_base_resolve_ipv4(dns, t->host, 0,
+			    resolved_host, t);
+		} else {
+			t->evdns_type = DNS_IPv6_AAAA;
+			evdns_base_resolve_ipv6(dns, t->host, 0,
+			    resolved_host, t);
+		}
+	}
+	return (t);
+}
+
 void
 usage(const char *whine)
 {
@@ -445,7 +482,6 @@ main(int argc, char *argv[])
 	struct event *ev;
 	struct target *t;
 	char *end;
-	int salen;
 	int i;
 	char ch;
 
@@ -529,26 +565,9 @@ main(int argc, char *argv[])
 	/* Add and resolve targets */
 	SLIST_INIT(&head);
 	for (i=argc-1; i>=0; i--) {
-		t = malloc(sizeof(*t));
-		memset(t, 0, sizeof(*t));
-		memset(t->res, ' ', sizeof(t->res));
-		strncat(t->host, argv[i], sizeof(t->host) - 1);
-		SLIST_INSERT_HEAD(&head, t, entries);
-
-		salen = sizeof(t->sa);
-		if (evutil_parse_sockaddr_port(t->host, sa(t), &salen) == 0) {
-			t->resolved = 1;
-			newtarget(t);
-		} else {
-			if (v4_flag) {
-				t->evdns_type = DNS_IPv4_A;
-				evdns_base_resolve_ipv4(dns, t->host, 0,
-				    resolved_host, t);
-			} else {
-				t->evdns_type = DNS_IPv6_AAAA;
-				evdns_base_resolve_ipv6(dns, t->host, 0,
-				    resolved_host, t);
-			}
+		if (newtarget(argv[i]) == NULL) {
+			perror("malloc");
+			return 1;
 		}
 	}
 	/* Schedule and resolve targets */
