@@ -49,79 +49,13 @@ struct stailqhead head = STAILQ_HEAD_INITIALIZER(head);
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 
-void write_first_packet(int, short, void *);
-void resolved_host(int, char, int, int, void *, void *);
+void activatetarget(struct target *);
+void marktarget(int, void *, int, int);
 static u_short in_cksum(u_short *, int);
 
 void (*init)(void) = termio_init;
 void (*update)(void) = termio_update;
 void (*cleanup)(void) = termio_cleanup;
-
-/*
- * Insert a new target into the hash table. Mark as a duplicate if the
- * key already exists.
- */
-void
-activatetarget(struct target *t)
-{
-	struct target *result;
-
-	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
-	if (result)
-		t->duplicate = result;
-	else
-		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
-}
-
-/*
- * Lookup target in the hash table
- */
-struct target *
-findtarget(int af, void *address)
-{
-	struct target *result;
-	union addr sa;
-
-	memset(&sa, 0, sizeof(sa));
-	if (af == AF_INET) {
-		sa.sin.sin_family = AF_INET;
-		memmove(&sa.sin.sin_addr, (struct in_addr *)address,
-		    sizeof(sa.sin.sin_addr));
-	} else if (af == AF_INET6) {
-		sa.sin6.sin6_family = AF_INET6;
-		memmove(&sa.sin6.sin6_addr, (struct in6_addr *)address,
-		    sizeof(sa.sin6.sin6_addr));
-	} else {
-		return NULL;
-	}
-	HASH_FIND(hh, hash, &sa, sizeof(union addr), result);
-	return (result);
-}
-
-/*
- * Mark a target and sequence with given symbol
- */
-void
-marktarget(int af, void *address, int seq, int ch)
-{
-	struct target *t;
-
-	t = findtarget(af, address);
-	if (t == NULL)
-		return; /* reply from unknown src */
-
-	t->res[seq % NUM] = ch;
-	if (a_flag && ch == '.') {
-		if (a_flag == 1)
-			write(STDOUT_FILENO, "\a", 1);
-		else if (a_flag >=2 &&
-		    t->res[(seq-3) % NUM] != '.' &&
-		    t->res[(seq-2) % NUM] != '.' &&
-		    t->res[(seq-1) % NUM] == '.' &&
-		    t->res[(seq-0) % NUM] == '.')
-			write(STDOUT_FILENO, "\a", 1);
-	}
-}
 
 /*
  * Callback for resolved domain names. On missing AAAA-record retry for
@@ -479,6 +413,73 @@ schedtargets(void)
 		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
 	}
 }
+
+/*
+ * Insert a new target into the hash table. Mark as a duplicate if the
+ * key already exists.
+ */
+void
+activatetarget(struct target *t)
+{
+	struct target *result;
+
+	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
+	if (result)
+		t->duplicate = result;
+	else
+		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
+}
+
+/*
+ * Lookup target in the hash table
+ */
+struct target *
+findtarget(int af, void *address)
+{
+	struct target *result;
+	union addr sa;
+
+	memset(&sa, 0, sizeof(sa));
+	if (af == AF_INET) {
+		sa.sin.sin_family = AF_INET;
+		memmove(&sa.sin.sin_addr, (struct in_addr *)address,
+		    sizeof(sa.sin.sin_addr));
+	} else if (af == AF_INET6) {
+		sa.sin6.sin6_family = AF_INET6;
+		memmove(&sa.sin6.sin6_addr, (struct in6_addr *)address,
+		    sizeof(sa.sin6.sin6_addr));
+	} else {
+		return NULL;
+	}
+	HASH_FIND(hh, hash, &sa, sizeof(union addr), result);
+	return (result);
+}
+
+/*
+ * Mark a target and sequence with given symbol
+ */
+void
+marktarget(int af, void *address, int seq, int ch)
+{
+	struct target *t;
+
+	t = findtarget(af, address);
+	if (t == NULL)
+		return; /* reply from unknown src */
+
+	t->res[seq % NUM] = ch;
+	if (a_flag && ch == '.') {
+		if (a_flag == 1)
+			write(STDOUT_FILENO, "\a", 1);
+		else if (a_flag >=2 &&
+		    t->res[(seq-3) % NUM] != '.' &&
+		    t->res[(seq-2) % NUM] != '.' &&
+		    t->res[(seq-1) % NUM] == '.' &&
+		    t->res[(seq-0) % NUM] == '.')
+			write(STDOUT_FILENO, "\a", 1);
+	}
+}
+
 
 void
 usage(const char *whine)
