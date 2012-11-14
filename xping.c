@@ -49,6 +49,7 @@ struct slisthead head = SLIST_HEAD_INITIALIZER(head);
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 
+void write_first_packet(int, short, void *);
 void resolved_host(int, char, int, int, void *, void *);
 static u_short in_cksum(u_short *, int);
 
@@ -458,6 +459,28 @@ newtarget(const char *hostname)
 }
 
 void
+schedtargets(void)
+{
+	struct target *t;
+	struct event *ev;
+	struct timeval tv;
+
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	SLIST_FOREACH(t, &head, entries) {
+		if (sa(t)->sa_family == AF_INET6) {
+			ev = event_new(ev_base, fd6, 0, write_first_packet, t);
+		} else {
+			ev = event_new(ev_base, fd4, 0, write_first_packet, t);
+		}
+		event_add(ev, &tv);
+		tv.tv_usec += 100*1000; /* target spacing: 100ms */
+		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
+		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
+	}
+}
+
+void
 usage(const char *whine)
 {
 	if (whine != NULL) {
@@ -478,9 +501,7 @@ usage(const char *whine)
 int
 main(int argc, char *argv[])
 {
-	struct timeval tv;
 	struct event *ev;
-	struct target *t;
 	char *end;
 	int i;
 	char ch;
@@ -570,21 +591,9 @@ main(int argc, char *argv[])
 			return 1;
 		}
 	}
-	/* Schedule and resolve targets */
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-	SLIST_FOREACH(t, &head, entries) {
-		if (sa(t)->sa_family == AF_INET6) {
-			ev = event_new(ev_base, fd6, 0, write_first_packet, t);
-		} else {
-			ev = event_new(ev_base, fd4, 0, write_first_packet, t);
-		}
-		event_add(ev, &tv);
-		tv.tv_usec += 100*1000; /* target spacing: 100ms */
-		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
-		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
-	}
+	schedtargets();
 
+	/* Startup UI and probing */
 	init();
 	event_base_dispatch(ev_base);
 	cleanup();
