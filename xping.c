@@ -501,9 +501,11 @@ usage(const char *whine)
 int
 main(int argc, char *argv[])
 {
+	char buf[BUFSIZ];
 	struct event *ev;
 	char *end;
 	int i;
+	int len;
 	char ch;
 
 	/* Open RAW-socket and drop root-privs */
@@ -560,9 +562,6 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
-	if (argc < 1) {
-		usage("no arguments");
-	}
 
 	/* Prepare statistics and datapacket */
 	stats = &statistics;
@@ -583,13 +582,30 @@ main(int argc, char *argv[])
 	ev = event_new(ev_base, fd6, EV_READ|EV_PERSIST, read_packet6, NULL);
 	event_add(ev, NULL);
 
-	/* Add and resolve targets */
+	/* Read targets from stdin and/or program arguments. */
 	SLIST_INIT(&head);
+	if (!isatty(STDIN_FILENO) || argc < 1) {
+		while(fgets(buf, sizeof(buf), stdin) != NULL) {
+			for (len = strlen(buf) - 1; len > 0; len--) {
+				if (strchr(" \t\n", buf[len]) == NULL)
+					break;
+				buf[len] = '\0';
+			}
+			if (buf[0] == '#' || len < 1)
+				continue;
+			if (newtarget(buf) == NULL) {
+				perror("malloc");
+			}
+		}
+	}
 	for (i=argc-1; i>=0; i--) {
 		if (newtarget(argv[i]) == NULL) {
 			perror("malloc");
 			return 1;
 		}
+	}
+	if (SLIST_EMPTY(&head)) {
+		usage("no arguments");
 	}
 	schedtargets();
 

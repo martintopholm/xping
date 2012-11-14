@@ -6,7 +6,7 @@
 .\" this stuff is worth it, you can buy me a beer in return Martin Topholm
 .\" ----------------------------------------------------------------------------
 .\"
-.Dd November 9, 2012
+.Dd November 14, 2012
 .Dt XPING 8
 .Os
 .Sh NAME
@@ -22,7 +22,8 @@
 is a simple PING program continiously probing multiple hosts using
 ICMP-ECHO. As packets are received dots are printed on the screen.
 Hosts not responding before next packet is due will get a questionmark
-in the display. The probing stops when SIGINT is received.
+in the display. The probing stops when SIGINT is received. Host to be
+probed are taken from argument list or read from stdin.
 .Pp
 .Sh OPTIONS
 .Bl -tag -width indent
