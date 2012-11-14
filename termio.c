@@ -23,6 +23,8 @@
 #include "xping.h"
 
 #ifndef NCURSES
+static char scrbuffer[4096];
+
 int
 getmaxx(void)
 {
@@ -107,6 +109,8 @@ termio_init(void)
 {
 #ifndef NCURSES
 	int y;
+
+	setvbuf(stdout, scrbuffer, _IOFBF, sizeof(scrbuffer));
 	y = getmaxy();
 	for (y = getmaxy(); y > 0; y--)
 		fprintf(stdout, "%cD", 0x1b);
