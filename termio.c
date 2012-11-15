@@ -153,6 +153,8 @@ termio_update(void)
 	clrtoeol();
 	mvprintw(0, col/2 - (8+strlen(version)+strlen(built))/2,
 	    "xping [%s]", version);
+	move(1, 0);
+	clrtoeol();
 
 	y = 2;
 	STAILQ_FOREACH(t, &head, entries) {
@@ -176,8 +178,8 @@ termio_update(void)
 		}
 		y++;
 	}
-
-	y++;
+	move(y++, 0);
+	clrtoeol();
 	mvprintw(y++, 0, "Legend  . echo-reply   ? timeout      # unreach    "
 	    "%%=other");
 	mvprintw(y++, 0, "        @ resolving    ! send-error");
@@ -193,6 +195,9 @@ termio_update(void)
 	mvprintw(y++, 0, "Runt: %d", stats->runt);
 	mvprintw(y++, 0, "Othr: %d", stats->other);
 #endif /* STATS */
+#ifdef NCURSES
+	mvprintw(y++, 0, "NCURSES");
+#endif
 	move(y++, 0);
 	clrtobot();
 
