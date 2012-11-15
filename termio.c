@@ -23,7 +23,7 @@
 #include "xping.h"
 
 #ifndef NCURSES
-static char scrbuffer[4096];
+static char *scrbuffer;
 
 int
 getmaxx(void)
@@ -108,11 +108,16 @@ void
 termio_init(void)
 {
 #ifndef NCURSES
-	int y;
+	int x, y;
 
-	setvbuf(stdout, scrbuffer, _IOFBF, sizeof(scrbuffer));
+	x = getmaxx();
 	y = getmaxy();
-	for (y = getmaxy(); y > 0; y--)
+	scrbuffer = malloc(x * y);
+	if (scrbuffer != NULL)
+		setvbuf(stdout, scrbuffer, _IOFBF, x * y);
+	else
+		perror("malloc");
+	for (; y > 0; y--)
 		fprintf(stdout, "%cD", 0x1b);
 	fprintf(stdout, "%c[H", 0x1b);
 	fprintf(stdout, "%c[s", 0x1b);
@@ -201,6 +206,9 @@ void
 termio_cleanup(void)
 {
 #ifndef NCURSES
+	setvbuf(stdout, NULL, _IONBF, 0);
+	if (scrbuffer)
+		free(scrbuffer);
 #else /* NCURSES */
 	endwin();
 #endif /* !NCURSES */
