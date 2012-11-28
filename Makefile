@@ -1,5 +1,5 @@
 #
-# PMake
+# Makefile for xping
 #
 
 LIBEVENT=libevent-2.0.18-stable
@@ -47,3 +47,8 @@ install:
 
 clean:
 	rm -f xping xping.o xping.8.gz termio.o version.o
+
+# Object dependencies
+ping.o: ping.c
+termio.o: termio.c xping.h queue.h uthash.h
+xping.o: xping.c xping.h queue.h uthash.h
