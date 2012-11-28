@@ -28,6 +28,7 @@ struct target {
 	int		npkts;
 	char		res[NUM+1];
 
+	struct event	*ev_write;
 	struct target	*duplicate;
 	STAILQ_ENTRY(target) entries;
 	UT_hash_handle	hh;

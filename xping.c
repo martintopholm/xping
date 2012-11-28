@@ -43,6 +43,7 @@ char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
 int	ident;
+struct	timeval tv_interval;
 
 struct target *hash = NULL;
 struct stailqhead head = STAILQ_HEAD_INITIALIZER(head);
@@ -271,7 +272,8 @@ write_packet6(int fd, short what, void *thunk)
 
 /*
  * Register status for send and "timed out" requests and send appropriate
- * request for target.
+ * request for target. Reschedules transmision if socket and address
+ * family mismatches.
  */
 void
 write_packet(int fd, short what, void *thunk)
@@ -285,6 +287,18 @@ write_packet(int fd, short what, void *thunk)
 		return;
 	}
 
+	/* Unresolved request */
+	if (!t->resolved) {
+		if (t->npkts > 0) {
+			SETRES(t, -1, '@');
+		}
+		SETRES(t, 0, '@');
+		t->npkts++;
+		update();
+		return;
+	}
+
+	/* Missed request */
 	if (t->npkts > 0 && GETRES(t, -1) != '.') {
 		if (GETRES(t, -1) == ' ')
 			SETRES(t, -1, '?');
@@ -298,6 +312,7 @@ write_packet(int fd, short what, void *thunk)
 			write(STDOUT_FILENO, "\a", 1);
 	}
 
+	/* Transmit request */
 	if (sa(t)->sa_family == AF_INET6) {
 		n = write_packet6(fd6, what, thunk);
 		len = ICMP6_MINLEN + datalen;
@@ -316,45 +331,34 @@ write_packet(int fd, short what, void *thunk)
 	}
 	stats->transmitted++;
 	t->npkts++;
+
+	/* Reschedule event if socket doesn't match address family. */
+	if ((sa(t)->sa_family == AF_INET6 && fd == fd4) ||
+	    (sa(t)->sa_family == AF_INET && fd == fd6)) {
+		if (t->ev_write) {
+			event_del(t->ev_write);
+			event_free(t->ev_write);
+		}
+		t->ev_write = event_new(ev_base,
+		    (sa(t)->sa_family == AF_INET6 ? fd6 : fd4), EV_PERSIST,
+		    write_packet, t);
+		event_add(t->ev_write, &tv_interval);
+	}
+
 	update();
 }
 
 /*
- * Does the initial scheduling of the packet transmission. Reschedules
- * callbck to self if DNS isn't resolved (and IPv4 or IPv6 socket determined).
+ * Does the scheduling of periodic transmissions.
  */
 void
 write_first_packet(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
-	struct event *ev;
-	struct timeval tv;
 
-	tv.tv_sec = i_interval / 1000;
-	tv.tv_usec = i_interval % 1000 * 1000;
-
-	/* Register unresolved missed packets */
-	if (!t->resolved) {
-		ev = event_new(ev_base, fd4, 0, write_first_packet, thunk);
-		event_add(ev, &tv);
-		if (t->npkts > 0) {
-			SETRES(t, -1, '@');
-		}
-		SETRES(t, 0, '@');
-		t->npkts++;
-		update();
-		return;
-	}
-
-	/* Schedule targets on proper socket */
-	if (sa(t)->sa_family == AF_INET6) {
-		write_packet(fd6, what, thunk);
-		ev = event_new(ev_base, fd6, EV_PERSIST, write_packet, t);
-	} else {
-		write_packet(fd4, what, thunk);
-		ev = event_new(ev_base, fd4, EV_PERSIST, write_packet, t);
-	}
-	event_add(ev, &tv);
+	t->ev_write = event_new(ev_base, fd, EV_PERSIST, write_packet, t);
+	event_add(t->ev_write, &tv_interval);
+	write_packet(fd, what, thunk);
 }
 
 /*
@@ -397,18 +401,19 @@ void
 schedtargets(void)
 {
 	struct target *t;
-	struct event *ev;
 	struct timeval tv;
 
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 	STAILQ_FOREACH(t, &head, entries) {
 		if (sa(t)->sa_family == AF_INET6) {
-			ev = event_new(ev_base, fd6, 0, write_first_packet, t);
+			t->ev_write = event_new(ev_base, fd6, 0,
+			    write_first_packet, t);
 		} else {
-			ev = event_new(ev_base, fd4, 0, write_first_packet, t);
+			t->ev_write = event_new(ev_base, fd4, 0,
+			    write_first_packet, t);
 		}
-		event_add(ev, &tv);
+		event_add(t->ev_write, &tv);
 		tv.tv_usec += 100*1000; /* target spacing: 100ms */
 		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
 		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
@@ -566,6 +571,8 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	/* Prepare statistics and datapacket */
+	tv_interval.tv_sec = i_interval / 1000;
+	tv_interval.tv_usec = i_interval % 1000 * 1000;
 	stats = &statistics;
 	memset(stats, 0, sizeof(*stats));
 	ident = getpid() & 0xffff;
