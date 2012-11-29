@@ -52,7 +52,10 @@ struct stailqhead head = STAILQ_HEAD_INITIALIZER(head);
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 
 void activatetarget(struct target *);
+void deactivatetarget(struct target *);
 void marktarget(int, void *, int, int);
+void resolvetarget(int, short, void *);
+
 static u_short in_cksum(u_short *, int);
 
 void (*init)(void) = termio_init;
@@ -68,6 +71,7 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
     void *thunk)
 {
 	struct target *t = thunk;
+	struct timeval tv;
 
 	/*
 	 * libevent resolver may give NXDOMAIN for an AAAA query when
@@ -83,24 +87,34 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 			t->evdns_type = DNS_IPv4_A;
 			evdns_base_resolve_ipv4(dns, t->host, 0,
 			    resolved_host, t);
+			return;
 		}
 	}
 
-	if (result != DNS_ERR_NONE)
+	if (result != DNS_ERR_NONE) {
+		evutil_timerclear(&tv);
+		tv.tv_sec = (ttl > 0 ? ttl : 60);
+		event_add(t->ev_resolve, &tv);
+		deactivatetarget(t);
 		return;
+	}
 
-	if (type == DNS_IPv6_AAAA && count > 0) {
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
-		    sizeof(sin6(t)->sin6_addr));
-		t->resolved = 1;
+	if (count > 0) {
+		if (type == DNS_IPv6_AAAA) {
+			sin6(t)->sin6_family = AF_INET6;
+			memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
+			    sizeof(sin6(t)->sin6_addr));
+		} else if (type == DNS_IPv4_A) {
+			sin(t)->sin_family = AF_INET;
+			memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
+			    sizeof(sin(t)->sin_addr));
+		}
 		activatetarget(t);
-	} else if (type == DNS_IPv4_A && count > 0) {
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
-		    sizeof(sin(t)->sin_addr));
-		t->resolved = 1;
-		activatetarget(t);
+		evutil_timerclear(&tv);
+		tv.tv_sec = ttl;
+		event_add(t->ev_resolve, &tv);
+	} else {
+		event_add(t->ev_resolve, &tv);
 	}
 }
 
@@ -368,6 +382,7 @@ write_first_packet(int fd, short what, void *thunk)
 struct target *
 newtarget(const char *hostname)
 {
+	struct timeval tv;
 	struct target * t;
 	int salen;
 
@@ -381,18 +396,11 @@ newtarget(const char *hostname)
 
 	salen = sizeof(t->sa);
 	if (evutil_parse_sockaddr_port(t->host, sa(t), &salen) == 0) {
-		t->resolved = 1;
 		activatetarget(t);
 	} else {
-		if (v4_flag) {
-			t->evdns_type = DNS_IPv4_A;
-			evdns_base_resolve_ipv4(dns, t->host, 0,
-			    resolved_host, t);
-		} else {
-			t->evdns_type = DNS_IPv6_AAAA;
-			evdns_base_resolve_ipv6(dns, t->host, 0,
-			    resolved_host, t);
-		}
+		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
+		evutil_timerclear(&tv);
+		event_add(t->ev_resolve, &tv);
 	}
 	return (t);
 }
@@ -407,10 +415,43 @@ activatetarget(struct target *t)
 	struct target *result;
 
 	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
-	if (result)
+	if (result == t)
+		; /* nothing, already active in hash */
+	else if (result)
 		t->duplicate = result;
 	else
 		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
+	t->resolved = 1;
+}
+
+/*
+ * Remove a target (t) from the hash table if the target is the currently
+ * active for the address. Secondly first target (t1) which was duplicate
+ * of target (t) is activated, and other duplicates will refer of that
+ * one (t) instead.
+ */
+void
+deactivatetarget(struct target *t)
+{
+	struct target *tmp, *t1;
+
+	t->resolved = 0;
+	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), tmp);
+	if (tmp == t) {
+		HASH_DELETE(hh, hash, t);
+		t1 = NULL;
+		STAILQ_FOREACH(tmp, &head, entries) {
+			if (tmp->duplicate == t) {
+				if (t1 == NULL) {
+					t1 = tmp;
+					t1->duplicate = NULL;
+					activatetarget(t1);
+				} else {
+					tmp->duplicate = t1;
+				}
+			}
+		}
+	}
 }
 
 /*
@@ -463,6 +504,21 @@ marktarget(int af, void *address, int seq, int ch)
 	}
 }
 
+void
+resolvetarget(int fd, short what, void *thunk)
+{
+	struct target *t = thunk;
+
+	if (!v4_flag) {
+		t->evdns_type = DNS_IPv6_AAAA;
+		evdns_base_resolve_ipv6(dns, t->host, 0,
+		    resolved_host, t);
+	} else {
+		t->evdns_type = DNS_IPv4_A;
+		evdns_base_resolve_ipv4(dns, t->host, 0,
+		    resolved_host, t);
+	}
+}
 
 void
 usage(const char *whine)
