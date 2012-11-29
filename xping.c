@@ -397,29 +397,6 @@ newtarget(const char *hostname)
 	return (t);
 }
 
-void
-schedtargets(void)
-{
-	struct target *t;
-	struct timeval tv;
-
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-	STAILQ_FOREACH(t, &head, entries) {
-		if (sa(t)->sa_family == AF_INET6) {
-			t->ev_write = event_new(ev_base, fd6, 0,
-			    write_first_packet, t);
-		} else {
-			t->ev_write = event_new(ev_base, fd4, 0,
-			    write_first_packet, t);
-		}
-		event_add(t->ev_write, &tv);
-		tv.tv_usec += 100*1000; /* target spacing: 100ms */
-		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
-		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
-	}
-}
-
 /*
  * Insert a new target into the hash table. Mark as a duplicate if the
  * key already exists.
@@ -509,6 +486,8 @@ int
 main(int argc, char *argv[])
 {
 	char buf[BUFSIZ];
+	struct timeval tv;
+	struct target *t;
 	struct event *ev;
 	char *end;
 	int i;
@@ -616,7 +595,24 @@ main(int argc, char *argv[])
 	if (STAILQ_EMPTY(&head)) {
 		usage("no arguments");
 	}
-	schedtargets();
+
+	/* Initial scheduling with increasing delay, distributes
+	 * transmissions across the interval and gives a cascading effect. */
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	STAILQ_FOREACH(t, &head, entries) {
+		if (sa(t)->sa_family == AF_INET6) {
+			t->ev_write = event_new(ev_base, fd6, 0,
+			    write_first_packet, t);
+		} else {
+			t->ev_write = event_new(ev_base, fd4, 0,
+			    write_first_packet, t);
+		}
+		event_add(t->ev_write, &tv);
+		tv.tv_usec += 100*1000; /* target spacing: 100ms */
+		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
+		tv.tv_usec -= (tv.tv_usec >= 1000000 ? 1000000 : 0);
+	}
 
 	/* Startup UI and probing */
 	init();
