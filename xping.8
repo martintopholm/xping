@@ -14,7 +14,7 @@
 .Nd A terminal based, adhoc, multi target icmp-echo tool.
 .Sh SYNOPSIS
 .Nm
-.Op Fl 46AVah
+.Op Fl 46ATVah
 .Op Fl i Ar interval
 .Op Ar host Op ...
 .Sh DESCRIPTION
@@ -38,6 +38,9 @@ state to unresponsive state (e.g. ..??).
 .Ar interval .
 .It Fl C
 Color resolved hostname according to address family.
+.It Fl T
+Track changes to resolved hostname, honoring TTL values. If not specified
+xping will still retry unresolved hostnames.
 .It Fl V
 Print the "version" of xping and exit.
 .It Fl a
