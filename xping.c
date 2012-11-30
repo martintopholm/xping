@@ -15,7 +15,6 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,7 +65,8 @@ void (*cleanup)(void) = termio_cleanup;
 
 /*
  * Callback for resolved domain names. On missing AAAA-record retry for
- * A-record instead.
+ * A-record instead. When resolving fails reschedule a new request either
+ * by built-in delay. type isn't available for failed requests.
  */
 void
 resolved_host(int result, char type, int count, int ttl, void *addresses,
@@ -76,51 +76,43 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 	struct timeval tv;
 
 	/*
-	 * libevent resolver may give NXDOMAIN for an AAAA query when
-	 * domain exists, but given RR doesn't. It appears when using
-	 * search domains. Resolver appears try search domains after
-	 * getting NOERROR with 0 answers.
-	 *
-	 * As a workaround assume that NXDOMAIN is the same as 0 answers
-	 * and try A lookup anyway unless we're in IPv6-only mode.
+	 * If request for AAAA-record failed (NXDOMAIN, SERVFAIL, et al),
+	 * retry for A-record. Otherwise reschedule a new request.
+	 * All diagnostics about the failed request are useless, since
+	 * they might refer to a search domain request, which is done
+	 * transparently after the real request.
 	 */
-	if (result == DNS_ERR_NOTEXIST || result == DNS_ERR_NODATA) {
+	if (result != DNS_ERR_NONE || count <= 0) {
 		if (t->evdns_type == DNS_IPv6_AAAA && !v6_flag) {
 			t->evdns_type = DNS_IPv4_A;
 			evdns_base_resolve_ipv4(dns, t->host, 0,
 			    resolved_host, t);
-			return;
+		} else {
+			evutil_timerclear(&tv);
+			tv.tv_sec = 60; /* neg-TTL might be search domain's */
+			event_add(t->ev_resolve, &tv);
+			deactivatetarget(t);
 		}
-	}
-
-	if (result != DNS_ERR_NONE) {
-		evutil_timerclear(&tv);
-		tv.tv_sec = (ttl > 0 ? ttl : 60);
-		event_add(t->ev_resolve, &tv);
-		deactivatetarget(t);
 		return;
 	}
 
-	if (count > 0) {
-		if (type == DNS_IPv6_AAAA) {
-			sin6(t)->sin6_family = AF_INET6;
-			memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
-			    sizeof(sin6(t)->sin6_addr));
-		} else if (type == DNS_IPv4_A) {
-			sin(t)->sin_family = AF_INET;
-			memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
-			    sizeof(sin(t)->sin_addr));
-		}
-		activatetarget(t);
-		if (T_flag) {
-			evutil_timerclear(&tv);
-			tv.tv_sec = (ttl > 0 ? ttl : 1);
-			event_add(t->ev_resolve, &tv);
-		}
-	} else {
-		/* This probably never happens, as DNS_ERR_NODATA is
-		 * used instead. */
-		assert(0);
+	/* Lookup succeeded, set address in record */
+	if (t->evdns_type == DNS_IPv6_AAAA) {
+		sin6(t)->sin6_family = AF_INET6;
+		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
+		    sizeof(sin6(t)->sin6_addr));
+	} else if (t->evdns_type == DNS_IPv4_A) {
+		sin(t)->sin_family = AF_INET;
+		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
+		    sizeof(sin(t)->sin_addr));
+	}
+	activatetarget(t);
+
+	/* Schedule new request, if tracking domain name */
+	if (T_flag) {
+		evutil_timerclear(&tv);
+		tv.tv_sec = MAX(ttl, 1); /* enforce min-TTL */
+		event_add(t->ev_resolve, &tv);
 	}
 }
 
@@ -309,9 +301,6 @@ write_packet(int fd, short what, void *thunk)
 
 	/* Unresolved request */
 	if (!t->resolved) {
-		if (t->npkts > 0) {
-			SETRES(t, -1, '@');
-		}
 		SETRES(t, 0, '@');
 		t->npkts++;
 		update();
@@ -510,6 +499,12 @@ marktarget(int af, void *address, int seq, int ch)
 	}
 }
 
+/*
+ * Sends out a DNS query for target through evdns. Called by the
+ * per target ev_resolve event. Scheduled once for each target at
+ * startup, * then repeated periodically for each unresolved host
+ * and if tracking (-T) when TTL expires.
+ */
 void
 resolvetarget(int fd, short what, void *thunk)
 {

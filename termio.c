@@ -159,10 +159,10 @@ termio_update(void)
 
 	y = 2;
 	STAILQ_FOREACH(t, &head, entries) {
-		if (C_flag && t->evdns_type && sa(t)->sa_family == AF_INET6)
+		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
 			mvprintw(y, 0, "%c[2;32m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
-		else if (C_flag && t->evdns_type && sa(t)->sa_family == AF_INET)
+		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
 			mvprintw(y, 0, "%c[2;31m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
 		else
