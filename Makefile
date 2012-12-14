@@ -11,7 +11,7 @@ CFLAGS=-Wall -Werror -I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 DEPS=check-libevent
 OBJS=xping.o termio.o version.o
-LIBS=-levent -lrt
+LIBS=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
@@ -35,7 +35,7 @@ TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 all: xping xping.8.gz
 
 check-libevent:
-	@echo -n 'Checking for libevent... '; \
+	@/bin/echo -n 'Checking for libevent... '; \
 	 (echo '#include <stdio.h>'; \
 	  echo '#include <event2/event.h>'; \
 	  echo 'int main()'; \
@@ -48,7 +48,7 @@ check-libevent:
 	@touch check-libevent
 
 check-curses:
-	@echo -n 'Checking for libcurses... '; \
+	@/bin/echo -n 'Checking for libcurses... '; \
 	 (echo '#include <stdio.h>'; \
 	  echo '#include <curses.h>'; \
 	  echo 'int main()'; \
@@ -58,7 +58,7 @@ check-curses:
 	  echo ""; \
 	  echo "libcurses not available in usual locations"; \
 	  echo ""; false)
-	@touch check-libevent
+	@touch check-curses
 
 libevent.a:
 	test -f $(LIBEVENT).tar.gz || wget https://github.com/downloads/libevent/libevent/$(LIBEVENT).tar.gz
@@ -70,7 +70,7 @@ libevent.a:
 version.o:
 	(printf "const char version[] = \"%s\";\n" $(VERSION); \
 	 printf "const char built[] = \"%s\";\n" $(TIMESTAMP)) | \
-	 gcc -x c -c -o version.o -
+	 $(CC) -x c -c -o version.o -
 
 xping: $(DEPS) $(OBJS)
 	$(CC) $(LDFLAGS) -g -o xping $(OBJS) $(LIBS)
@@ -85,7 +85,7 @@ install: xping xping.8.gz
 	install -m 444 xping.8.gz $(MANPATH)/man8/
 
 clean:
-	rm -f check-libevent check-ncurses xping .o xping.8.gz $(OBJS)
+	rm -f check-libevent check-curses xping xping.8.gz $(OBJS)
 
 # Object dependencies
 ping.o: ping.c
