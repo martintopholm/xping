@@ -377,6 +377,7 @@ write_first_packet(int fd, short what, void *thunk)
 struct target *
 newtarget(const char *hostname)
 {
+	union addr sa;
 	struct timeval tv;
 	struct target * t;
 	int salen;
@@ -389,8 +390,16 @@ newtarget(const char *hostname)
 	strncat(t->host, hostname, sizeof(t->host) - 1);
 	STAILQ_INSERT_TAIL(&head, t, entries);
 
-	salen = sizeof(t->sa);
-	if (evutil_parse_sockaddr_port(t->host, sa(t), &salen) == 0) {
+	salen = sizeof(sa);
+	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
+		sa(t)->sa_family = sa.sa.sa_family;
+		if (sa.sa.sa_family == AF_INET6) {
+			memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
+			    sizeof(sin6(t)->sin6_addr));
+		} else {
+			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
+			    sizeof(sin(t)->sin_addr));
+		}
 		activatetarget(t);
 	} else {
 		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
