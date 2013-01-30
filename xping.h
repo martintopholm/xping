@@ -12,6 +12,7 @@
 
 extern STAILQ_HEAD(stailqhead, target) head;
 extern int C_flag;
+extern int numtargets;
 
 union addr {
 	struct sockaddr sa;

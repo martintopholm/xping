@@ -45,6 +45,7 @@ char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
 int	ident;
 struct	timeval tv_interval;
+int	numtargets = 0;
 
 struct target *hash = NULL;
 struct stailqhead head = STAILQ_HEAD_INITIALIZER(head);
@@ -406,6 +407,7 @@ newtarget(const char *hostname)
 		evutil_timerclear(&tv);
 		event_add(t->ev_resolve, &tv);
 	}
+	numtargets++;
 	return (t);
 }
 

@@ -11,6 +11,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -22,6 +23,14 @@
 #endif /* !NCURSES */
 
 #include "xping.h"
+
+#ifndef STATS
+#define PADDING 5
+#else
+#define PADDING (5+7)
+#endif
+
+static int cursor_y;
 
 #ifndef NCURSES
 static char *scrbuffer;
@@ -100,7 +109,43 @@ refresh(void)
 {
 	fflush(stdout);
 }
+
+static void
+scrollup(int n)
+{
+	int i;
+
+	for (i=0; i < n; i++)
+		fprintf(stdout, "%cM", 0x1b);
+}
+
+static void
+scrolldown(int n)
+{
+	int i;
+
+	for (i=0; i < n; i++)
+		fprintf(stdout, "%cD", 0x1b);
+}
 #endif
+
+/*
+ * Window changed: move up from current line to the "first" line, clear
+ * screen and redraw. XXX: we may continue in the middle of an update,
+ * so we should probably just make a new reference point and schedule an
+ * immediate update after signal processing.
+ */
+#ifndef NCURSES
+void
+sigwinch(int sig)
+{
+	scrollup(cursor_y);
+	cursor_y = 0;
+	fprintf(stdout, "%c[2K\r", 0x1b);
+	clrtobot();
+	termio_update(); /* XXX: this is probably a bad idea */
+}
+#endif /* !NCURSES */
 
 /*
  * Prepares the terminal for drawing
@@ -109,8 +154,10 @@ void
 termio_init(void)
 {
 #ifndef NCURSES
+	struct target *t;
 	int x, y;
 
+	signal(SIGWINCH, sigwinch);
 	x = getmaxx();
 	y = getmaxy();
 	scrbuffer = malloc(x * y);
@@ -118,11 +165,18 @@ termio_init(void)
 		setvbuf(stdout, scrbuffer, _IOFBF, x * y);
 	else
 		perror("malloc");
-	for (; y > 0; y--)
-		fprintf(stdout, "%cD", 0x1b);
-	fprintf(stdout, "%c[H", 0x1b);
-	fprintf(stdout, "%c[s", 0x1b);
-	clrtobot();
+
+	/* Reserve space on terminal */
+	cursor_y = 2;
+	DL_FOREACH(list, t)
+		cursor_y++;
+#ifdef STATS
+	cursor_y += 7;
+#endif
+	cursor_y += 3; /* legend */
+	scrolldown(cursor_y);
+
+	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
 #else /* NCURSES */
 	initscr();
 #endif /* !NCURSES */
@@ -136,7 +190,6 @@ termio_update(void)
 {
 	struct target *t;
 	int col;
-	int y;
 
 	int i, imax, ifirst, ilast;
 
@@ -150,25 +203,32 @@ termio_update(void)
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
 
-	move(0, 0);
-	clrtoeol();
-	mvprintw(0, col/2 - (8+strlen(version)+strlen(built))/2,
-	    "xping [%s]", version);
-	move(1, 0);
-	clrtoeol();
+#ifndef NCURSES
+	/* Establish reference point on "first" output line */
+	for (i=0; i < cursor_y; i++)
+		fprintf(stdout, "%cM", 0x1b);
+	fprintf(stdout, "\r%c[s", 0x1b);
+#endif /* !NCURSES */
 
-	y = 2;
+	cursor_y = 0;
+	move(cursor_y, 0);
+	clrtoeol();
+	mvprintw(cursor_y, col/2 - (8+strlen(version))/2,
+	    "xping [%s]", version);
+	move(++cursor_y, 0);
+
 	STAILQ_FOREACH(t, &head, entries) {
+		move(++cursor_y, 0);
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			mvprintw(y, 0, "%c[2;32m%19.19s%c[0m ",
+			mvprintw(cursor_y, 0, "%c[2;32m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
 		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			mvprintw(y, 0, "%c[2;31m%19.19s%c[0m ",
+			mvprintw(cursor_y, 0, "%c[2;31m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
 		else
-			mvprintw(y, 0, "%19.19s ", t->host);
+			mvprintw(cursor_y, 0, "%19.19s ", t->host);
 		if (t->duplicate != NULL)
-			mvprintw(y, 20, "(duplicate of %s)", t->duplicate->host);
+			mvprintw(cursor_y, 20, "(duplicate of %s)", t->duplicate->host);
 		else {
 			for (i=ifirst; i<ilast; i++) {
 				if (i < t->npkts)
@@ -177,29 +237,28 @@ termio_update(void)
 					addch(' ');
 			}
 		}
-		y++;
 	}
-	move(y++, 0);
+	move(++cursor_y, 0);
 	clrtoeol();
-	mvprintw(y++, 0, "Legend  . echo-reply   ? timeout      # unreach    "
+	mvprintw(++cursor_y, 0, "Legend  . echo-reply   ? timeout      # unreach    "
 	    "%%=other");
-	mvprintw(y++, 0, "        @ resolving    ! send-error");
+	mvprintw(++cursor_y, 0, "        @ resolving    ! send-error");
 	if (C_flag)
-		mvprintw(y-1, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
+		mvprintw(cursor_y, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
 		    0x1b, 0x1b, 0x1b, 0x1b);
 #ifdef STATS
-	y++;
-	mvprintw(y++, 0, "Sent: %d", stats->transmitted);
-	mvprintw(y++, 0, "Recv: %d", stats->received);
-	mvprintw(y++, 0, "ErrO: %d", stats->sendto_err);
-	mvprintw(y++, 0, "ErrI: %d", stats->recvfrom_err);
-	mvprintw(y++, 0, "Runt: %d", stats->runt);
-	mvprintw(y++, 0, "Othr: %d", stats->other);
+	cursor_y++;
+	mvprintw(++cursor_y, 0, "Sent: %d", stats->transmitted);
+	mvprintw(++cursor_y, 0, "Recv: %d", stats->received);
+	mvprintw(++cursor_y, 0, "ErrO: %d", stats->sendto_err);
+	mvprintw(++cursor_y, 0, "ErrI: %d", stats->recvfrom_err);
+	mvprintw(++cursor_y, 0, "Runt: %d", stats->runt);
+	mvprintw(++cursor_y, 0, "Othr: %d", stats->other);
 #endif /* STATS */
 #ifdef NCURSES
-	mvprintw(y++, 0, "NCURSES");
-#endif
-	move(y++, 0);
+	mvprintw(++cursor_y, 0, "NCURSES");
+#endif /* NCURSES */
+	move(++cursor_y, 0);
 	clrtobot();
 
 	refresh();
