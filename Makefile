@@ -78,7 +78,7 @@ xping: $(DEPS) $(OBJS)
 xping.8.gz: xping.8
 	gzip -c xping.8 > xping.8.gz
 
-install: xping xping.8.gz
+install:
 	mkdir -p $(SBINPATH)
 	mkdir -p $(MANPATH)/man8
 	install -m 4555 xping $(SBINPATH)/
