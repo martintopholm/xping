@@ -88,6 +88,5 @@ clean:
 	rm -f check-libevent check-curses xping xping.8.gz $(OBJS)
 
 # Object dependencies
-ping.o: ping.c
-termio.o: termio.c xping.h queue.h uthash.h
-xping.o: xping.c xping.h queue.h uthash.h
+termio.o: termio.c xping.h uthash.h utlist.h
+xping.o: xping.c xping.h uthash.h utlist.h

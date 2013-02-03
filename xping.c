@@ -48,7 +48,7 @@ struct	timeval tv_interval;
 int	numtargets = 0;
 
 struct target *hash = NULL;
-struct stailqhead head = STAILQ_HEAD_INITIALIZER(head);
+struct target *list = NULL;
 
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
@@ -389,7 +389,7 @@ newtarget(const char *hostname)
 	memset(t, 0, sizeof(*t));
 	memset(t->res, ' ', sizeof(t->res));
 	strncat(t->host, hostname, sizeof(t->host) - 1);
-	STAILQ_INSERT_TAIL(&head, t, entries);
+	DL_APPEND(list, t);
 
 	salen = sizeof(sa);
 	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
@@ -446,7 +446,7 @@ deactivatetarget(struct target *t)
 	if (tmp == t) {
 		HASH_DELETE(hh, hash, t);
 		t1 = NULL;
-		STAILQ_FOREACH(tmp, &head, entries) {
+		DL_FOREACH(list, tmp) {
 			if (tmp->duplicate == t) {
 				if (t1 == NULL) {
 					t1 = tmp;
@@ -642,7 +642,7 @@ main(int argc, char *argv[])
 	event_add(ev, NULL);
 
 	/* Read targets from program arguments and/or stdin. */
-	STAILQ_INIT(&head);
+	list = NULL;
 	for (i=0; i<argc; i++) {
 		if (newtarget(argv[i]) == NULL) {
 			perror("malloc");
@@ -665,7 +665,7 @@ main(int argc, char *argv[])
 			}
 		}
 	}
-	if (STAILQ_EMPTY(&head)) {
+	if (list == NULL) {
 		usage("no arguments");
 	}
 
@@ -673,7 +673,7 @@ main(int argc, char *argv[])
 	 * transmissions across the interval and gives a cascading effect. */
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
-	STAILQ_FOREACH(t, &head, entries) {
+	DL_FOREACH(list, t) {
 		if (sa(t)->sa_family == AF_INET6) {
 			t->ev_write = event_new(ev_base, fd6, 0,
 			    write_first_packet, t);

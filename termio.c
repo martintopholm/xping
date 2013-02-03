@@ -193,7 +193,7 @@ termio_update(void)
 
 	int i, imax, ifirst, ilast;
 
-	t = STAILQ_FIRST(&head);
+	t = list;
 	if (t == NULL)
 		return;
 
@@ -217,7 +217,7 @@ termio_update(void)
 	    "xping [%s]", version);
 	move(++cursor_y, 0);
 
-	STAILQ_FOREACH(t, &head, entries) {
+	DL_FOREACH(list, t) {
 		move(++cursor_y, 0);
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
 			mvprintw(cursor_y, 0, "%c[2;32m%19.19s%c[0m ",

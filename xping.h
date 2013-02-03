@@ -3,14 +3,14 @@
 
 #include <netinet/in.h>
 
-#include "queue.h"
 #include "uthash.h"
+#include "utlist.h"
 
 
 #define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 #define NUM 300
 
-extern STAILQ_HEAD(stailqhead, target) head;
+extern struct target *list;
 extern int C_flag;
 extern int numtargets;
 
@@ -32,8 +32,9 @@ struct target {
 	struct event	*ev_resolve;
 	struct event	*ev_write;
 	struct target	*duplicate;
-	STAILQ_ENTRY(target) entries;
+
 	UT_hash_handle	hh;
+	struct target	*prev, *next;
 };
 
 struct statistics {
