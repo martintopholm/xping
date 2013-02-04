@@ -12,7 +12,7 @@ LDFLAGS=-L/usr/local/lib
 DEPS=check-libevent
 OBJS=xping.o termio.o version.o
 LIBS=-levent
-VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
+VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.1`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 # Static libevent linking (OSX doesn't use -lrt)

@@ -39,7 +39,7 @@ when it has opened the sockets.
 Changes
 -------
 
-v1.0+
+v1.1
 
   * replaced BSD queue.h with utlist.h by Troy D. Hanson
   * improved dns lookup
