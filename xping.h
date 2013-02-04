@@ -12,6 +12,7 @@
 
 extern struct target *list;
 extern int C_flag;
+extern int o_flag;
 extern int numtargets;
 
 union addr {
