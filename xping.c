@@ -31,6 +31,7 @@ int	i_interval = 1000;
 int	a_flag = 0;
 int	A_flag = 0;
 int	C_flag = 0;
+int	o_flag = 0;
 int	T_flag = 0;
 int	v4_flag = 0;
 int	v6_flag = 0;
@@ -539,7 +540,7 @@ usage(const char *whine)
 		fprintf(stderr, "%s\n", whine);
 	}
 	fprintf(stderr,
-	    "usage: xping [-46ACTVah] [-i interval] host [host [...]]\n"
+	    "usage: xping [-46ACTVaho] [-i interval] host [host [...]]\n"
 	    "\n");
 	exit(EX_USAGE);
 }
@@ -576,7 +577,7 @@ main(int argc, char *argv[])
 	}
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46ACTai:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ACTaoi:hV")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
@@ -609,6 +610,9 @@ main(int argc, char *argv[])
 			fprintf(stderr, "%s %s (built %s)\n", "xping",
 			    version, built);
 			return (0);
+		case 'o':
+			o_flag = 1;
+			break;
 		case 'h':
 			usage(NULL);
 			/* NOTREACHED */

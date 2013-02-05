@@ -167,13 +167,15 @@ termio_init(void)
 		perror("malloc");
 
 	/* Reserve space on terminal */
-	cursor_y = 2;
-	DL_FOREACH(list, t)
-		cursor_y++;
+	cursor_y = 2; /* header */
 #ifdef STATS
 	cursor_y += 7;
 #endif
 	cursor_y += 3; /* legend */
+	if (o_flag)
+		cursor_y = 0;
+	DL_FOREACH(list, t)
+		cursor_y++;
 	scrolldown(cursor_y);
 
 	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
@@ -211,11 +213,13 @@ termio_update(void)
 #endif /* !NCURSES */
 
 	cursor_y = 0;
-	move(cursor_y, 0);
-	clrtoeol();
-	mvprintw(cursor_y, col/2 - (8+strlen(version))/2,
-	    "xping [%s]", version);
-	move(++cursor_y, 0);
+	if (!o_flag) {
+		move(cursor_y, 0);
+		clrtoeol();
+		mvprintw(cursor_y, col/2 - (8+strlen(version))/2,
+				"xping [%s]", version);
+		move(++cursor_y, 0);
+	}
 
 	DL_FOREACH(list, t) {
 		move(++cursor_y, 0);
@@ -238,14 +242,17 @@ termio_update(void)
 			}
 		}
 	}
-	move(++cursor_y, 0);
-	clrtoeol();
-	mvprintw(++cursor_y, 0, "Legend  . echo-reply   ? timeout      # unreach    "
-	    "%%=other");
-	mvprintw(++cursor_y, 0, "        @ resolving    ! send-error");
-	if (C_flag)
-		mvprintw(cursor_y, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
-		    0x1b, 0x1b, 0x1b, 0x1b);
+	if (!o_flag) {
+		move(++cursor_y, 0);
+		clrtoeol();
+		mvprintw(++cursor_y, 0, "Legend  . echo-reply   ? timeout      # unreach    "
+				"%%=other");
+		mvprintw(++cursor_y, 0, "        @ resolving    ! send-error");
+		if (C_flag)
+			mvprintw(cursor_y, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
+					0x1b, 0x1b, 0x1b, 0x1b);
+	}
+
 #ifdef STATS
 	cursor_y++;
 	mvprintw(++cursor_y, 0, "Sent: %d", stats->transmitted);
