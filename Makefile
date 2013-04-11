@@ -10,9 +10,9 @@ MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 DEPS=check-libevent
-OBJS=xping.o termio.o version.o
+OBJS=xping.o termio.o report.o version.o
 LIBS=-levent
-VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.1`"
+VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 # Static libevent linking (OSX doesn't use -lrt)
@@ -87,6 +87,7 @@ install:
 clean:
 	rm -f check-libevent check-curses xping xping.8.gz $(OBJS)
 
-# Object dependencies
+# Object dependencies (gcc -MM *.c)
+report.o: report.c xping.h uthash.h utlist.h
 termio.o: termio.c xping.h uthash.h utlist.h
 xping.o: xping.c xping.h uthash.h utlist.h

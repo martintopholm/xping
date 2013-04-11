@@ -60,4 +60,9 @@ void termio_init(void);
 void termio_update(void);
 void termio_cleanup(void);
 
+/* from report.c */
+void report_init(void);
+void report_update(void);
+void report_cleanup(void);
+
 #endif /* !XPING_H */

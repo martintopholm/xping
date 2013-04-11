@@ -15,6 +15,7 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,6 +64,16 @@ static u_short in_cksum(u_short *, int);
 void (*init)(void) = termio_init;
 void (*update)(void) = termio_update;
 void (*cleanup)(void) = termio_cleanup;
+
+/*
+ * Signal to catch program termination
+ */
+void sigint(int sig)
+{
+	event_base_loopexit(ev_base, NULL);
+	signal(SIGINT, SIG_DFL);
+	signal(SIGTERM, SIG_DFL);
+}
 
 /*
  * Callback for resolved domain names. On missing AAAA-record retry for
@@ -665,6 +676,11 @@ main(int argc, char *argv[])
 			}
 		}
 	}
+	if (!isatty(STDOUT_FILENO)) {
+		init = report_init;
+		update = report_update;
+		cleanup = report_cleanup;
+	}
 	if (list == NULL) {
 		usage("no arguments");
 	}
@@ -688,6 +704,8 @@ main(int argc, char *argv[])
 	}
 
 	/* Startup UI and probing */
+	signal(SIGINT, sigint);
+	signal(SIGTERM, sigint);
 	init();
 	event_base_dispatch(ev_base);
 	cleanup();

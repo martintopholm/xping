@@ -1,0 +1,46 @@
+/*-
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * <mph@hoth.dk> wrote this file. As long as you retain this notice you
+ * can do whatever you want with this stuff. If we meet some day, and you think
+ * this stuff is worth it, you can buy me a beer in return Martin Topholm
+ * ----------------------------------------------------------------------------
+ */
+
+#include <sys/param.h>
+
+#include <stdio.h>
+
+#include "xping.h"
+
+void report_init()
+{
+}
+
+void report_update()
+{
+}
+
+void report_cleanup()
+{
+	struct target *t;
+	int i, imax, ifirst, ilast;
+
+	t = list;
+	if (t == NULL)
+		return;
+
+	imax = MIN(t->npkts, NUM);
+	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
+	ilast = t->npkts;
+
+	DL_FOREACH(list, t) {
+		fprintf(stdout, "%19.19s ", t->host);
+		for (i=ifirst; i<ilast; i++) {
+			if (i < t->npkts) fputc(t->res[i % NUM], stdout);
+			else fputc(' ', stdout);
+		}
+		fputc('\n', stdout);
+	}
+}
+
