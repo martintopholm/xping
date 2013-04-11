@@ -30,6 +30,7 @@
 /* Option flags */
 int	i_interval = 1000;
 int	a_flag = 0;
+int	c_count = 0;
 int	A_flag = 0;
 int	C_flag = 0;
 int	T_flag = 0;
@@ -47,6 +48,7 @@ int	datalen = 56;
 int	ident;
 struct	timeval tv_interval;
 int	numtargets = 0;
+int	numcomplete = 0;
 
 struct target *hash = NULL;
 struct target *list = NULL;
@@ -306,6 +308,17 @@ write_packet(int fd, short what, void *thunk)
 	int len;
 	int n;
 
+	/* Check packet count limit */
+	if (c_count && t->npkts >= c_count) {
+		numcomplete++;
+		event_del(t->ev_write);
+		if (numcomplete >= numtargets) {
+			event_base_loopexit(ev_base, NULL);
+		}
+		return;
+	}
+
+	/* Skip any duplicate targets */
 	if (t->duplicate != NULL) {
 		t->npkts++;
 		return;
@@ -550,7 +563,7 @@ usage(const char *whine)
 		fprintf(stderr, "%s\n", whine);
 	}
 	fprintf(stderr,
-	    "usage: xping [-46ACTVah] [-i interval] host [host [...]]\n"
+	    "usage: xping [-46ACTVah] [-c count] [-i interval] host [host [...]]\n"
 	    "\n");
 	exit(EX_USAGE);
 }
@@ -587,7 +600,7 @@ main(int argc, char *argv[])
 	}
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46ACTai:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ACTac:i:hV")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
@@ -605,6 +618,9 @@ main(int argc, char *argv[])
 			break;
 		case 'C':
 			C_flag = 1;
+			break;
+		case 'c':
+			c_count = strtol(optarg, &end, 10);
 			break;
 		case 'T':
 			T_flag = 1;

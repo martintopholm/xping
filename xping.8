@@ -15,6 +15,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl 46ATVah
+.Op Fl c Ar count
 .Op Fl i Ar interval
 .Op Ar host Op ...
 .Sh DESCRIPTION
@@ -38,6 +39,9 @@ If given multiple times only print bell if host goes from a responsive
 state to unresponsive state (e.g. ..??).
 .It Fl C
 Color resolved hostname according to address family.
+.It Fl c Ar count
+Send count probes in a non-interactive fashion. Default is to operate
+interactively and keep sending probes.
 .It Fl T
 Track changes to resolved hostname, honoring TTL values. If not specified
 xping will still retry unresolved hostnames.
