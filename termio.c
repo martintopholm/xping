@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <termios.h>
 #include <unistd.h>
 
 #ifndef NCURSES
@@ -34,6 +35,7 @@ static int cursor_y;
 
 #ifndef NCURSES
 static char *scrbuffer;
+struct termios oterm;
 
 int
 getmaxx(void)
@@ -154,6 +156,7 @@ void
 termio_init(void)
 {
 #ifndef NCURSES
+	struct termios term;
 	struct target *t;
 	int x, y;
 
@@ -177,6 +180,12 @@ termio_init(void)
 	scrolldown(cursor_y);
 
 	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
+
+	if (isatty(STDIN_FILENO) && tcgetattr(STDIN_FILENO, &oterm) == 0) {
+		memcpy(&term, &oterm, sizeof(term));
+		term.c_lflag &= ~(ECHO | ECHONL);
+		tcsetattr(STDIN_FILENO, TCSAFLUSH, &term);
+	}
 #else /* NCURSES */
 	initscr();
 #endif /* !NCURSES */
@@ -274,6 +283,8 @@ termio_cleanup(void)
 	setvbuf(stdout, NULL, _IONBF, 0);
 	if (scrbuffer)
 		free(scrbuffer);
+	if (isatty(STDIN_FILENO))
+		tcsetattr(STDIN_FILENO, TCSAFLUSH, &oterm); // XXX: TCASOFT? see openssh
 #else /* NCURSES */
 	endwin();
 #endif /* !NCURSES */
