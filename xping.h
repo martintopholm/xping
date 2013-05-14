@@ -1,11 +1,13 @@
 #ifndef XPING_H
 #define XPING_H
 
+#include <sys/param.h>
+#include <sys/socket.h>
+
 #include <netinet/in.h>
 
 #include "uthash.h"
 #include "utlist.h"
-
 
 #define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 #define NUM 300
