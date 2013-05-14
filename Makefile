@@ -8,7 +8,7 @@ PREFIX=/usr/local
 SBINPATH=$(PREFIX)/bin
 MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I/usr/local/include
-LDFLAGS=-L/usr/local/lib
+LDFLAGS=-L/usr/local/lib -L/usr/local/lib/event2
 DEPS=check-libevent
 OBJS=xping.o termio.o report.o version.o
 LIBS=-levent
@@ -40,7 +40,7 @@ check-libevent:
 	  echo '#include <event2/event.h>'; \
 	  echo 'int main()'; \
 	  echo '{ printf("%s\\n", event_get_version()); return 0; }' \
-	 ) | $(CC) $(CFLAGS) -x c -o /dev/null - -levent >/dev/null 2>/dev/null && echo yes || \
+	 ) | $(CC) $(CFLAGS) $(LDFLAGS) -x c -o /dev/null - -levent >/dev/null 2>/dev/null && echo yes || \
 	 (echo no; \
 	  echo ""; \
 	  echo "libevent not available in usual locations"; \
