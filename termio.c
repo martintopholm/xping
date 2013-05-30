@@ -181,10 +181,10 @@ termio_init(void)
 
 	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
 
-	if (isatty(STDIN_FILENO) && tcgetattr(STDIN_FILENO, &oterm) == 0) {
+	if (isatty(STDOUT_FILENO) && tcgetattr(STDOUT_FILENO, &oterm) == 0) {
 		memcpy(&term, &oterm, sizeof(term));
 		term.c_lflag &= ~(ECHO | ECHONL);
-		tcsetattr(STDIN_FILENO, TCSAFLUSH, &term);
+		tcsetattr(STDOUT_FILENO, TCSAFLUSH, &term);
 	}
 #else /* NCURSES */
 	initscr();
