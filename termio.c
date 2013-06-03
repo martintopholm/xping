@@ -25,12 +25,6 @@
 
 #include "xping.h"
 
-#ifndef STATS
-#define PADDING 5
-#else
-#define PADDING (5+7)
-#endif
-
 static int cursor_y;
 
 #ifndef NCURSES
@@ -170,13 +164,11 @@ termio_init(void)
 		perror("malloc");
 
 	/* Reserve space on terminal */
-	cursor_y = 2;
 	DL_FOREACH(list, t)
 		cursor_y++;
 #ifdef STATS
 	cursor_y += 7;
 #endif
-	cursor_y += 3; /* legend */
 	scrolldown(cursor_y);
 
 	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
@@ -221,13 +213,7 @@ termio_update(void)
 
 	cursor_y = 0;
 	move(cursor_y, 0);
-	clrtoeol();
-	mvprintw(cursor_y, col/2 - (8+strlen(version))/2,
-	    "xping [%s]", version);
-	move(++cursor_y, 0);
-
 	DL_FOREACH(list, t) {
-		move(++cursor_y, 0);
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
 			mvprintw(cursor_y, 0, "%c[2;32m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
@@ -246,30 +232,23 @@ termio_update(void)
 					addch(' ');
 			}
 		}
+		move(++cursor_y, 0);
 	}
-	move(++cursor_y, 0);
 	clrtoeol();
-	mvprintw(++cursor_y, 0, "Legend  . echo-reply   ? timeout      # unreach    "
-	    "%%=other");
-	mvprintw(++cursor_y, 0, "        @ resolving    ! send-error");
-	if (C_flag)
-		mvprintw(cursor_y, 38, "%c[2;32mIPv6%c[0m/%c[2;31mIPv4%c[0m",
-		    0x1b, 0x1b, 0x1b, 0x1b);
 #ifdef STATS
-	cursor_y++;
 	mvprintw(++cursor_y, 0, "Sent: %d", stats->transmitted);
 	mvprintw(++cursor_y, 0, "Recv: %d", stats->received);
 	mvprintw(++cursor_y, 0, "ErrO: %d", stats->sendto_err);
 	mvprintw(++cursor_y, 0, "ErrI: %d", stats->recvfrom_err);
 	mvprintw(++cursor_y, 0, "Runt: %d", stats->runt);
 	mvprintw(++cursor_y, 0, "Othr: %d", stats->other);
+	move(++cursor_y, 0);
 #endif /* STATS */
 #ifdef NCURSES
 	mvprintw(++cursor_y, 0, "NCURSES");
-#endif /* NCURSES */
 	move(++cursor_y, 0);
+#endif /* NCURSES */
 	clrtobot();
-
 	refresh();
 }
 

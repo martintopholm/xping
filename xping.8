@@ -38,7 +38,7 @@ Print a bell character on stdout when a packet is missed within
 If given multiple times only print bell if host goes from a responsive
 state to unresponsive state (e.g. ..??).
 .It Fl C
-Color resolved hostname according to address family.
+Color resolved hostname according to address family (IPv4 red, IPv6 green).
 .It Fl c Ar count
 Send count probes in a non-interactive fashion. Default is to operate
 interactively and keep sending probes.
@@ -55,6 +55,21 @@ Display program usage and exit.
 .It Fl i Ar interval
 Specifies interval between successive packets to a host. Default
 is 1.0 seconds.
+.El
+.Sh LEGEND
+.Bl -tag -width indent
+.It .
+Reply received
+.It ?
+Timeout - interval password with no reply.
+.It #
+Unreachable - the packet could not be delivered.
+.It %
+Other error e.g. TTL expired in transit.
+.It @
+Resolving - waiting for dns lookup to complete.
+.It !
+sendto error e.g. permission denied or no route to destination.
 .El
 .Sh DIAGNOSTICS
 .Bl -tag -width indent
