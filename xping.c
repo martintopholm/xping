@@ -149,7 +149,6 @@ read_packet4(int fd, short what, void *thunk)
 	n = recvfrom(fd, inpacket, sizeof(inpacket), 0,
 	    (struct sockaddr *)&sin, &salen);
 	if (n < 0) {
-		stats->recvfrom_err++;
 		return;
 	}
 
@@ -159,7 +158,6 @@ read_packet4(int fd, short what, void *thunk)
 		return;
 	}
 	if (n < hlen + ICMP_MINLEN) {
-		stats->runt++;
 		return;
 	}
 
@@ -170,7 +168,6 @@ read_packet4(int fd, short what, void *thunk)
 
 		seq = ntohs(icp->icmp_seq);
 		marktarget(AF_INET, &sin.sin_addr, seq, '.');
-		stats->received++;
 	} else {
 		/* Skip short icmp error packets. */
 		if (n < ICMP_MINLEN * 2 + sizeof(struct ip))
@@ -191,7 +188,6 @@ read_packet4(int fd, short what, void *thunk)
 			marktarget(AF_INET, &oip->ip_dst, seq, '#');
 		else
 			marktarget(AF_INET, &oip->ip_dst, seq, '%');
-		stats->other++;
 	}
 }
 
@@ -212,11 +208,9 @@ read_packet6(int fd, short what, void *thunk)
 	n = recvfrom(fd, inpacket, sizeof(inpacket), 0,
 	    (struct sockaddr *)&sin6, &salen);
 	if (n < 0) {
-		stats->recvfrom_err++;
 		return;
 	}
 	if (n < ICMP6_MINLEN) {
-		stats->runt++;
 		return;
 	}
 
@@ -230,7 +224,6 @@ read_packet6(int fd, short what, void *thunk)
 
 		seq = ntohs(icmp6h->icmp6_seq);
 		marktarget(AF_INET6, &sin6.sin6_addr, seq, '.');
-		stats->received++;
 	} else {
 		/* Skip short icmp error packets. */
 		if (n < ICMP6_MINLEN * 2 + sizeof(struct ip6_hdr))
@@ -251,7 +244,6 @@ read_packet6(int fd, short what, void *thunk)
 			marktarget(AF_INET6, &oip6->ip6_dst, seq, '#');
 		else
 			marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
-		stats->other++;
 	}
 }
 
@@ -355,13 +347,10 @@ write_packet(int fd, short what, void *thunk)
 	SETRES(t, 0, ' ');
 
 	if (n < 0) {
-		stats->sendto_err++;
 		SETRES(t, 0, '!'); /* transmit error */
 	} else if (n != len) {
-		stats->sendto_err++;
 		SETRES(t, 0, '$'); /* partial transmit */
 	}
-	stats->transmitted++;
 	t->npkts++;
 
 	/* Reschedule event if socket doesn't match address family. */
@@ -647,11 +636,9 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* Prepare statistics and datapacket */
+	/* Prepare datapacket */
 	tv_interval.tv_sec = i_interval / 1000;
 	tv_interval.tv_usec = i_interval % 1000 * 1000;
-	stats = &statistics;
-	memset(stats, 0, sizeof(*stats));
 	ident = getpid() & 0xffff;
 	for (i=0; i<datalen; i++) {
 		outpacket[ICMP_MINLEN + i] = '0' + i;

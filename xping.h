@@ -39,16 +39,6 @@ struct target {
 	struct target	*prev, *next;
 };
 
-struct statistics {
-	int		transmitted;
-	int		received;
-
-	int		sendto_err;
-	int		recvfrom_err;
-	int		runt;
-	int		other;
-} statistics, *stats;
-
 #define sa(x) ((struct sockaddr *)(&x->sa))
 #define sin(x) ((struct sockaddr_in *)(&x->sa))
 #define sin6(x) ((struct sockaddr_in6 *)(&x->sa))

@@ -216,9 +216,6 @@ termio_init(void)
 	/* Reserve space on terminal */
 	DL_FOREACH(list, t)
 		cursor_y++;
-#ifdef STATS
-	cursor_y += 7;
-#endif
 	scrolldown(cursor_y);
 
 	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
@@ -269,15 +266,6 @@ termio_update(struct target *selective)
 		ifirst_state = ifirst;
 	}
 	clrtoeol();
-#ifdef STATS
-	mvprintw(++cursor_y, 0, "Sent: %d", stats->transmitted);
-	mvprintw(++cursor_y, 0, "Recv: %d", stats->received);
-	mvprintw(++cursor_y, 0, "ErrO: %d", stats->sendto_err);
-	mvprintw(++cursor_y, 0, "ErrI: %d", stats->recvfrom_err);
-	mvprintw(++cursor_y, 0, "Runt: %d", stats->runt);
-	mvprintw(++cursor_y, 0, "Othr: %d", stats->other);
-	move(++cursor_y, 0);
-#endif /* STATS */
 #ifdef NCURSES
 	mvprintw(++cursor_y, 0, "NCURSES");
 	move(++cursor_y, 0);

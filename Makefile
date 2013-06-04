@@ -22,9 +22,6 @@ TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 #LIBS=-lrt
 #LDFLAGS=-L./$(LIBEVENT)/.libs
 
-# Display statistics
-#CFLAGS+=-DSTATS
-
 # Dynamic link and use ncurses
 #DEPS+=check-curses
 #CFLAGS+=-DNCURSES
