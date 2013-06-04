@@ -64,7 +64,7 @@ void resolvetarget(int, short, void *);
 static u_short in_cksum(u_short *, int);
 
 void (*init)(void) = termio_init;
-void (*update)(void) = termio_update;
+void (*update)(struct target *) = termio_update;
 void (*cleanup)(void) = termio_cleanup;
 
 /*
@@ -193,7 +193,6 @@ read_packet4(int fd, short what, void *thunk)
 			marktarget(AF_INET, &oip->ip_dst, seq, '%');
 		stats->other++;
 	}
-	update();
 }
 
 void
@@ -254,8 +253,6 @@ read_packet6(int fd, short what, void *thunk)
 			marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
 		stats->other++;
 	}
-
-	update();
 }
 
 int
@@ -328,7 +325,7 @@ write_packet(int fd, short what, void *thunk)
 	if (!t->resolved) {
 		SETRES(t, 0, '@');
 		t->npkts++;
-		update();
+		update(t);
 		return;
 	}
 
@@ -344,6 +341,7 @@ write_packet(int fd, short what, void *thunk)
 		    GETRES(t, -2) != '.' &&
 		    GETRES(t, -1) != '.')
 			write(STDOUT_FILENO, "\a", 1);
+		update(t);
 	}
 
 	/* Transmit request */
@@ -379,7 +377,7 @@ write_packet(int fd, short what, void *thunk)
 		event_add(t->ev_write, &tv_interval);
 	}
 
-	update();
+	update(t);
 }
 
 /*
@@ -532,6 +530,8 @@ marktarget(int af, void *address, int seq, int ch)
 		    t->res[(seq-0) % NUM] == '.')
 			write(STDOUT_FILENO, "\a", 1);
 	}
+
+	update(t);
 }
 
 /*

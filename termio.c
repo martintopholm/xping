@@ -26,6 +26,7 @@
 #include "xping.h"
 
 static int cursor_y;
+static int ifirst_state;
 
 #ifndef NCURSES
 static char *scrbuffer;
@@ -139,9 +140,57 @@ sigwinch(int sig)
 	cursor_y = 0;
 	fprintf(stdout, "%c[2K\r", 0x1b);
 	clrtobot();
-	termio_update(); /* XXX: this is probably a bad idea */
+	termio_update(NULL); /* XXX: this is probably a bad idea */
 }
 #endif /* !NCURSES */
+
+static void
+updatesingle(int ifirst, struct target *selective)
+{
+	struct target *t;
+	int i;
+
+	i = 0;
+	DL_FOREACH(list, t) {
+		if (t == selective) {
+			move(cursor_y = i, 20+(t->npkts-1-ifirst));
+			addch(t->res[(t->npkts-1) % NUM]);
+		}
+		i++;
+	}
+	move(cursor_y = i, 0);
+}
+
+static void
+updatefull(int ifirst, int ilast)
+{
+	struct target *t;
+	int i;
+
+	cursor_y = 0;
+	move(cursor_y, 0);
+	DL_FOREACH(list, t) {
+		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
+			mvprintw(cursor_y, 0, "%c[2;32m%19.19s%c[0m ",
+			    0x1b, t->host, 0x1b);
+		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
+			mvprintw(cursor_y, 0, "%c[2;31m%19.19s%c[0m ",
+			    0x1b, t->host, 0x1b);
+		else
+			mvprintw(cursor_y, 0, "%19.19s ", t->host);
+		if (t->duplicate != NULL)
+			mvprintw(cursor_y, 20, "(duplicate of %s)", t->duplicate->host);
+		else {
+			for (i=ifirst; i<ilast; i++) {
+				if (i < t->npkts)
+					addch(t->res[i % NUM]);
+				else
+					addch(' ');
+			}
+		}
+		move(++cursor_y, 0);
+	}
+}
 
 /*
  * Prepares the terminal for drawing
@@ -149,6 +198,7 @@ sigwinch(int sig)
 void
 termio_init(void)
 {
+	ifirst_state = -1;
 #ifndef NCURSES
 	struct termios term;
 	struct target *t;
@@ -187,12 +237,20 @@ termio_init(void)
  * Draws the recorded replies on the terminal.
  */
 void
-termio_update(void)
+termio_update(struct target *selective)
 {
 	struct target *t;
 	int col;
 
-	int i, imax, ifirst, ilast;
+	int imax, ifirst, ilast;
+#ifndef NCURSES
+	int i;
+
+	/* Establish reference point on "first" output line */
+	for (i=0; i < cursor_y; i++)
+		fprintf(stdout, "%cM", 0x1b);
+	fprintf(stdout, "\r%c[s", 0x1b);
+#endif /* !NCURSES */
 
 	t = list;
 	if (t == NULL)
@@ -204,35 +262,11 @@ termio_update(void)
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
 
-#ifndef NCURSES
-	/* Establish reference point on "first" output line */
-	for (i=0; i < cursor_y; i++)
-		fprintf(stdout, "%cM", 0x1b);
-	fprintf(stdout, "\r%c[s", 0x1b);
-#endif /* !NCURSES */
-
-	cursor_y = 0;
-	move(cursor_y, 0);
-	DL_FOREACH(list, t) {
-		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			mvprintw(cursor_y, 0, "%c[2;32m%19.19s%c[0m ",
-			    0x1b, t->host, 0x1b);
-		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			mvprintw(cursor_y, 0, "%c[2;31m%19.19s%c[0m ",
-			    0x1b, t->host, 0x1b);
-		else
-			mvprintw(cursor_y, 0, "%19.19s ", t->host);
-		if (t->duplicate != NULL)
-			mvprintw(cursor_y, 20, "(duplicate of %s)", t->duplicate->host);
-		else {
-			for (i=ifirst; i<ilast; i++) {
-				if (i < t->npkts)
-					addch(t->res[i % NUM]);
-				else
-					addch(' ');
-			}
-		}
-		move(++cursor_y, 0);
+	if (selective != NULL && ifirst == ifirst_state) {
+		updatesingle(ifirst, selective);
+	} else {
+		updatefull(ifirst, ilast);
+		ifirst_state = ifirst;
 	}
 	clrtoeol();
 #ifdef STATS

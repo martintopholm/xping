@@ -17,7 +17,7 @@ void report_init()
 {
 }
 
-void report_update()
+void report_update(struct target *t)
 {
 }
 
