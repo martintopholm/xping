@@ -43,6 +43,9 @@ struct target {
 #define sin(x) ((struct sockaddr_in *)(&x->sa))
 #define sin6(x) ((struct sockaddr_in6 *)(&x->sa))
 
+#define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
+#define GETRES(t,i) t->res[(t->npkts+i) % NUM]
+
 /* from "version.c" */
 extern const char version[];
 extern const char built[];

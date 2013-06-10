@@ -53,9 +53,6 @@ int	numcomplete = 0;
 struct target *hash = NULL;
 struct target *list = NULL;
 
-#define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
-#define GETRES(t,i) t->res[(t->npkts+i) % NUM]
-
 void activatetarget(struct target *);
 void deactivatetarget(struct target *);
 void marktarget(int, void *, int, int);
