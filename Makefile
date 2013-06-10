@@ -10,7 +10,7 @@ MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I/usr/local/include
 LDFLAGS=-L/usr/local/lib -L/usr/local/lib/event2
 DEPS=check-libevent
-OBJS=xping.o termio.o report.o version.o
+OBJS=xping.o termio.o report.o version.o icmp.o
 LIBS=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"

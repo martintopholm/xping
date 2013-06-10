@@ -40,12 +40,12 @@ int	v6_flag = 0;
 /* Global structures */
 int	fd4;
 int	fd6;
+extern char outpacket[];
+extern char outpacket6[];
+extern int datalen;
+extern int ident;
 struct	event_base *ev_base;
 struct	evdns_base *dns;
-char	outpacket[IP_MAXPACKET];
-char	outpacket6[IP_MAXPACKET];
-int	datalen = 56;
-int	ident;
 struct	timeval tv_interval;
 int	numtargets = 0;
 int	numcomplete = 0;
@@ -566,7 +566,6 @@ main(int argc, char *argv[])
 	char buf[BUFSIZ];
 	struct timeval tv;
 	struct target *t;
-	struct event *ev;
 	char *end;
 	int i;
 	int len;
@@ -633,24 +632,13 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* Prepare datapacket */
 	tv_interval.tv_sec = i_interval / 1000;
 	tv_interval.tv_usec = i_interval % 1000 * 1000;
-	ident = getpid() & 0xffff;
-	for (i=0; i<datalen; i++) {
-		outpacket[ICMP_MINLEN + i] = '0' + i;
-		outpacket6[ICMP6_MINLEN + i] = '0' + i;
-	}
 
 	/* Prepare event system and inbound socket */
 	ev_base = event_base_new();
 	dns = evdns_base_new(ev_base, 1);
-	evutil_make_socket_nonblocking(fd4);
-	ev = event_new(ev_base, fd4, EV_READ|EV_PERSIST, read_packet4, NULL);
-	event_add(ev, NULL);
-	evutil_make_socket_nonblocking(fd6);
-	ev = event_new(ev_base, fd6, EV_READ|EV_PERSIST, read_packet6, NULL);
-	event_add(ev, NULL);
+	probe_setup();
 
 	/* Read targets from program arguments and/or stdin. */
 	list = NULL;

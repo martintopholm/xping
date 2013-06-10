@@ -6,6 +6,8 @@
 
 #include <netinet/in.h>
 
+#include <event2/event.h>
+
 #include "uthash.h"
 #include "utlist.h"
 
@@ -59,5 +61,8 @@ void termio_cleanup(void);
 void report_init(void);
 void report_update(struct target *);
 void report_cleanup(void);
+
+/* from icmp.c */
+void probe_setup();
 
 #endif /* !XPING_H */
