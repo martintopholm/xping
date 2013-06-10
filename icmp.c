@@ -24,6 +24,8 @@ extern int fd4;
 extern int fd6;
 void read_packet4(int fd, short what, void *thunk);
 void read_packet6(int fd, short what, void *thunk);
+void activatetarget(struct target *);
+void resolvetarget(int, short, void *);
 
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
@@ -52,4 +54,44 @@ probe_setup()
 	evutil_make_socket_nonblocking(fd6);
 	ev = event_new(ev_base, fd6, EV_READ|EV_PERSIST, read_packet6, NULL);
 	event_add(ev, NULL);
+}
+
+/*
+ * Allocate structure for a new target and insert into list of all
+ * our targets.
+ */
+struct target *
+probe_add(const char *line)
+{
+	union addr sa;
+	struct timeval tv;
+	struct target * t;
+	int salen;
+
+	t = malloc(sizeof(*t));
+	if (t == NULL)
+		return (t);
+	memset(t, 0, sizeof(*t));
+	memset(t->res, ' ', sizeof(t->res));
+	strncat(t->host, line, sizeof(t->host) - 1);
+	DL_APPEND(list, t);
+
+	salen = sizeof(sa);
+	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
+		sa(t)->sa_family = sa.sa.sa_family;
+		if (sa.sa.sa_family == AF_INET6) {
+			memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
+			    sizeof(sin6(t)->sin6_addr));
+		} else {
+			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
+			    sizeof(sin(t)->sin_addr));
+		}
+		activatetarget(t);
+	} else {
+		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
+		evutil_timerclear(&tv);
+		event_add(t->ev_resolve, &tv);
+	}
+	numtargets++;
+	return (t);
 }

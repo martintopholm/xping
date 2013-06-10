@@ -380,46 +380,6 @@ write_first_packet(int fd, short what, void *thunk)
 }
 
 /*
- * Allocate structure for a new target and insert into list of all
- * our targets.
- */
-struct target *
-newtarget(const char *hostname)
-{
-	union addr sa;
-	struct timeval tv;
-	struct target * t;
-	int salen;
-
-	t = malloc(sizeof(*t));
-	if (t == NULL)
-		return (t);
-	memset(t, 0, sizeof(*t));
-	memset(t->res, ' ', sizeof(t->res));
-	strncat(t->host, hostname, sizeof(t->host) - 1);
-	DL_APPEND(list, t);
-
-	salen = sizeof(sa);
-	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
-		sa(t)->sa_family = sa.sa.sa_family;
-		if (sa.sa.sa_family == AF_INET6) {
-			memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
-			    sizeof(sin6(t)->sin6_addr));
-		} else {
-			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
-			    sizeof(sin(t)->sin_addr));
-		}
-		activatetarget(t);
-	} else {
-		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
-		evutil_timerclear(&tv);
-		event_add(t->ev_resolve, &tv);
-	}
-	numtargets++;
-	return (t);
-}
-
-/*
  * Insert a new target into the hash table. Mark as a duplicate if the
  * key already exists.
  */
@@ -643,7 +603,7 @@ main(int argc, char *argv[])
 	/* Read targets from program arguments and/or stdin. */
 	list = NULL;
 	for (i=0; i<argc; i++) {
-		if (newtarget(argv[i]) == NULL) {
+		if (probe_add(argv[i]) == NULL) {
 			perror("malloc");
 			return 1;
 		}
@@ -659,7 +619,7 @@ main(int argc, char *argv[])
 			}
 			if (buf[0] == '#' || len < 1)
 				continue;
-			if (newtarget(buf) == NULL) {
+			if (probe_add(buf) == NULL) {
 				perror("malloc");
 			}
 		}

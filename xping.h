@@ -14,6 +14,7 @@
 #define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 #define NUM 300
 
+extern struct event_base *ev_base;
 extern struct target *list;
 extern int C_flag;
 extern int numtargets;
@@ -64,5 +65,6 @@ void report_cleanup(void);
 
 /* from icmp.c */
 void probe_setup();
+struct target *probe_add(const char *);
 
 #endif /* !XPING_H */
