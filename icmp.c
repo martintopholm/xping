@@ -23,9 +23,8 @@
 /* inherit stuff from xping.c */
 extern int fd4;
 extern int fd6;
-void activatetarget(struct target *);
-void resolvetarget(int, short, void *);
-void marktarget(int af, void *address, int seq, int ch);
+struct target *findtarget(int af, void *address);
+void marktarget(struct target *t, int seq, int ch);
 
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
@@ -121,8 +120,21 @@ write_packet6(int fd, short what, void *thunk)
 }
 
 /*
- * Receive packet from IPv4 socket, parse it and associate with an active
- * target via marktarget.
+ * find
+ */
+static void
+find_marktarget(int af, void *address, int seq, int ch)
+{
+	struct target *t;
+	t = findtarget(af, address);
+	if (t == NULL)
+		return; /* unknown source address */
+	marktarget(t, seq, ch);
+}
+
+/*
+ * Receive packet from IPv4 socket, parse it and associate result with
+ * an active target via marktarget.
  */
 static void
 read_packet4(int fd, short what, void *thunk)
@@ -161,7 +173,7 @@ read_packet4(int fd, short what, void *thunk)
 			return; /*  skip other ping sessions */
 
 		seq = ntohs(icp->icmp_seq);
-		marktarget(AF_INET, &sin.sin_addr, seq, '.');
+		find_marktarget(AF_INET, &sin.sin_addr, seq, '.');
 	} else {
 		/* Skip short icmp error packets. */
 		if (n < ICMP_MINLEN * 2 + sizeof(struct ip))
@@ -179,9 +191,9 @@ read_packet4(int fd, short what, void *thunk)
 
 		seq = ntohs(oicp->icmp_seq);
 		if (icp->icmp_type == ICMP_UNREACH)
-			marktarget(AF_INET, &oip->ip_dst, seq, '#');
+			find_marktarget(AF_INET, &oip->ip_dst, seq, '#');
 		else
-			marktarget(AF_INET, &oip->ip_dst, seq, '%');
+			find_marktarget(AF_INET, &oip->ip_dst, seq, '%');
 	}
 }
 
@@ -221,7 +233,7 @@ read_packet6(int fd, short what, void *thunk)
 			return;
 
 		seq = ntohs(icmp6h->icmp6_seq);
-		marktarget(AF_INET6, &sin6.sin6_addr, seq, '.');
+		find_marktarget(AF_INET6, &sin6.sin6_addr, seq, '.');
 	} else {
 		/* Skip short icmp error packets. */
 		if (n < ICMP6_MINLEN * 2 + sizeof(struct ip6_hdr))
@@ -239,9 +251,9 @@ read_packet6(int fd, short what, void *thunk)
 
 		seq = ntohs(oicmp6h->icmp6_seq);
 		if (icmp6h->icmp6_type == ICMP6_DST_UNREACH)
-			marktarget(AF_INET6, &oip6->ip6_dst, seq, '#');
+			find_marktarget(AF_INET6, &oip6->ip6_dst, seq, '#');
 		else
-			marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
+			find_marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
 	}
 }
 
@@ -277,8 +289,7 @@ struct target *
 probe_add(const char *line)
 {
 	union addr sa;
-	struct timeval tv;
-	struct target * t;
+	struct target *t;
 	int salen;
 
 	t = malloc(sizeof(*t));
@@ -299,13 +310,8 @@ probe_add(const char *line)
 			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
 			    sizeof(sin(t)->sin_addr));
 		}
-		activatetarget(t);
-	} else {
-		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
-		evutil_timerclear(&tv);
-		event_add(t->ev_resolve, &tv);
+		t->resolved = 1;
 	}
-	numtargets++;
 	return (t);
 }
 

@@ -51,7 +51,6 @@ struct target *list = NULL;
 
 void activatetarget(struct target *);
 void deactivatetarget(struct target *);
-void marktarget(int, void *, int, int);
 void resolvetarget(int, short, void *);
 
 void (*init)(void) = termio_init;
@@ -281,14 +280,8 @@ findtarget(int af, void *address)
  * Mark a target and sequence with given symbol
  */
 void
-marktarget(int af, void *address, int seq, int ch)
+marktarget(struct target *t, int seq, int ch)
 {
-	struct target *t;
-
-	t = findtarget(af, address);
-	if (t == NULL)
-		return; /* reply from unknown src */
-
 	t->res[seq % NUM] = ch;
 	if (a_flag && ch == '.') {
 		if (a_flag == 1)
@@ -324,6 +317,29 @@ resolvetarget(int fd, short what, void *thunk)
 		evdns_base_resolve_ipv4(dns, t->host, 0,
 		    resolved_host, t);
 	}
+}
+
+/*
+ * Create a new a probe target, apply resolver if needed.
+ */
+int
+addtarget(const char *line)
+{
+	struct target *t;
+	struct timeval tv;
+
+	t = probe_add(line);
+	if (t == NULL)
+		return -1;
+	if (t->resolved)
+		activatetarget(t);
+	else {
+		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
+		evutil_timerclear(&tv);
+		event_add(t->ev_resolve, &tv);
+	}
+	numtargets++;
+	return 0;
 }
 
 void
@@ -427,7 +443,7 @@ main(int argc, char *argv[])
 	/* Read targets from program arguments and/or stdin. */
 	list = NULL;
 	for (i=0; i<argc; i++) {
-		if (probe_add(argv[i]) == NULL) {
+		if (addtarget(argv[i]) < 0) {
 			perror("malloc");
 			return 1;
 		}
@@ -443,8 +459,9 @@ main(int argc, char *argv[])
 			}
 			if (buf[0] == '#' || len < 1)
 				continue;
-			if (probe_add(buf) == NULL) {
+			if (addtarget(buf) < 0) {
 				perror("malloc");
+				return 1;
 			}
 		}
 	}
