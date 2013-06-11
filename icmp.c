@@ -24,8 +24,6 @@ extern int fd4;
 extern int fd6;
 void read_packet4(int fd, short what, void *thunk);
 void read_packet6(int fd, short what, void *thunk);
-int write_packet4(int fd, short what, void *thunk);
-int write_packet6(int fd, short what, void *thunk);
 void activatetarget(struct target *);
 void resolvetarget(int, short, void *);
 
@@ -33,6 +31,94 @@ char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
 int	ident;
+
+/* From the original ping.c by Mike Muus... */
+/*
+ * in_cksum --
+ *      Checksum routine for Internet Protocol family headers (C Version)
+ */
+static u_short
+in_cksum(u_short *addr, int len)
+{
+	int nleft, sum;
+	u_short *w;
+	union {
+		u_short us;
+		u_char  uc[2];
+	} last;
+	u_short answer;
+
+	nleft = len;
+	sum = 0;
+	w = addr;
+
+	/*
+	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
+	 * sequential 16 bit words to it, and at the end, fold back all the
+	 * carry bits from the top 16 bits into the lower 16 bits.
+	 */
+	while (nleft > 1)  {
+		sum += *w++;
+		nleft -= 2;
+	}
+
+	/* mop up an odd byte, if necessary */
+	if (nleft == 1) {
+		last.uc[0] = *(u_char *)w;
+		last.uc[1] = 0;
+		sum += last.us;
+	}
+
+	/* add back carry outs from top 16 bits to low 16 bits */
+	sum = (sum >> 16) + (sum & 0xffff);     /* add hi 16 to low 16 */
+	sum += (sum >> 16);                     /* add carry */
+	answer = ~sum;                          /* truncate to 16 bits */
+	return(answer);
+}
+
+/*
+ * Send out icmp packet for target.
+ */
+static int
+write_packet4(int fd, short what, void *thunk)
+{
+	struct target *t = thunk;
+	struct icmp *icp;
+	int len;
+
+	len = ICMP_MINLEN + datalen;
+	icp = (struct icmp *)outpacket;
+	icp->icmp_type = ICMP_ECHO;
+	icp->icmp_code = 0;
+	icp->icmp_cksum = 0;
+	icp->icmp_seq = htons(t->npkts);
+	icp->icmp_id = htons(ident);
+	icp->icmp_cksum = in_cksum((u_short *)icp, len);
+
+	return sendto(fd, outpacket, len, 0, sa(t),
+	    sizeof(struct sockaddr_in));
+}
+
+/*
+ * Send out icmp6 packet for target.
+ */
+static int
+write_packet6(int fd, short what, void *thunk)
+{
+	struct target *t = thunk;
+	struct icmp6_hdr *icmp6h;
+	int len;
+
+	len = ICMP6_MINLEN + datalen;
+	icmp6h = (struct icmp6_hdr *)outpacket6;
+	icmp6h->icmp6_type = ICMP6_ECHO_REQUEST;
+	icmp6h->icmp6_code = 0;
+	icmp6h->icmp6_cksum = 0;
+	icmp6h->icmp6_seq = htons(t->npkts);
+	icmp6h->icmp6_id = htons(ident);
+	return sendto(fd, outpacket6, len, 0, sa(t),
+	    sizeof(struct sockaddr_in6));
+}
 
 /*
  * Prepare datastructures and events needed for probe

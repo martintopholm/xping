@@ -40,8 +40,6 @@ int	v6_flag = 0;
 /* Global structures */
 int	fd4;
 int	fd6;
-extern char outpacket[];
-extern char outpacket6[];
 extern int datalen;
 extern int ident;
 struct	event_base *ev_base;
@@ -57,8 +55,6 @@ void activatetarget(struct target *);
 void deactivatetarget(struct target *);
 void marktarget(int, void *, int, int);
 void resolvetarget(int, short, void *);
-
-static u_short in_cksum(u_short *, int);
 
 void (*init)(void) = termio_init;
 void (*update)(struct target *) = termio_update;
@@ -242,44 +238,6 @@ read_packet6(int fd, short what, void *thunk)
 		else
 			marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
 	}
-}
-
-int
-write_packet4(int fd, short what, void *thunk)
-{
-	struct target *t = thunk;
-	struct icmp *icp;
-	int len;
-
-	len = ICMP_MINLEN + datalen;
-	icp = (struct icmp *)outpacket;
-	icp->icmp_type = ICMP_ECHO;
-	icp->icmp_code = 0;
-	icp->icmp_cksum = 0;
-	icp->icmp_seq = htons(t->npkts);
-	icp->icmp_id = htons(ident);
-	icp->icmp_cksum = in_cksum((u_short *)icp, len);
-
-	return sendto(fd, outpacket, len, 0, sa(t),
-	    sizeof(struct sockaddr_in));
-}
-
-int
-write_packet6(int fd, short what, void *thunk)
-{
-	struct target *t = thunk;
-	struct icmp6_hdr *icmp6h;
-	int len;
-
-	len = ICMP6_MINLEN + datalen;
-	icmp6h = (struct icmp6_hdr *)outpacket6;
-	icmp6h->icmp6_type = ICMP6_ECHO_REQUEST;
-	icmp6h->icmp6_code = 0;
-	icmp6h->icmp6_cksum = 0;
-	icmp6h->icmp6_seq = htons(t->npkts);
-	icmp6h->icmp6_id = htons(ident);
-	return sendto(fd, outpacket6, len, 0, sa(t),
-	    sizeof(struct sockaddr_in6));
 }
 
 /*
@@ -646,48 +604,4 @@ main(int argc, char *argv[])
 	close(fd4);
 	close(fd6);
 	return 0;
-}
-
-/* From the original ping.c by Mike Muus... */
-/*
- * in_cksum --
- *      Checksum routine for Internet Protocol family headers (C Version)
- */
-u_short
-in_cksum(u_short *addr, int len)
-{
-	int nleft, sum;
-	u_short *w;
-	union {
-		u_short us;
-		u_char  uc[2];
-	} last;
-	u_short answer;
-
-	nleft = len;
-	sum = 0;
-	w = addr;
-
-	/*
-	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
-	 * sequential 16 bit words to it, and at the end, fold back all the
-	 * carry bits from the top 16 bits into the lower 16 bits.
-	 */
-	while (nleft > 1)  {
-		sum += *w++;
-		nleft -= 2;
-	}
-
-	/* mop up an odd byte, if necessary */
-	if (nleft == 1) {
-		last.uc[0] = *(u_char *)w;
-		last.uc[1] = 0;
-		sum += last.us;
-	}
-
-	/* add back carry outs from top 16 bits to low 16 bits */
-	sum = (sum >> 16) + (sum & 0xffff);     /* add hi 16 to low 16 */
-	sum += (sum >> 16);                     /* add carry */
-	answer = ~sum;                          /* truncate to 16 bits */
-	return(answer);
 }
