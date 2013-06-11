@@ -73,7 +73,7 @@ sigint(int sig)
  * by built-in delay. type isn't available for failed requests.
  */
 void
-resolved_host(int result, char type, int count, int ttl, void *addresses,
+target_is_resolved(int result, char type, int count, int ttl, void *addresses,
     void *thunk)
 {
 	struct target *t = thunk;
@@ -90,7 +90,7 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 		if (t->evdns_type == DNS_IPv6_AAAA && !v6_flag) {
 			t->evdns_type = DNS_IPv4_A;
 			evdns_base_resolve_ipv4(dns, t->host, 0,
-			    resolved_host, t);
+			    target_is_resolved, t);
 		} else {
 			evutil_timerclear(&tv);
 			tv.tv_sec = 60; /* neg-TTL might be search domain's */
@@ -117,6 +117,28 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 		evutil_timerclear(&tv);
 		tv.tv_sec = MAX(ttl, 1); /* enforce min-TTL */
 		event_add(t->ev_resolve, &tv);
+	}
+}
+
+/*
+ * Sends out a DNS query for target through evdns. Called by the
+ * per target ev_resolve event. Scheduled once for each target at
+ * startup, * then repeated periodically for each unresolved host
+ * and if tracking (-T) when TTL expires.
+ */
+void
+target_resolve(int fd, short what, void *thunk)
+{
+	struct target *t = thunk;
+
+	if (!v4_flag) {
+		t->evdns_type = DNS_IPv6_AAAA;
+		evdns_base_resolve_ipv6(dns, t->host, 0,
+		    target_is_resolved, t);
+	} else {
+		t->evdns_type = DNS_IPv4_A;
+		evdns_base_resolve_ipv4(dns, t->host, 0,
+		    target_is_resolved, t);
 	}
 }
 
@@ -295,28 +317,6 @@ target_mark(struct target *t, int seq, int ch)
 	}
 
 	update(t);
-}
-
-/*
- * Sends out a DNS query for target through evdns. Called by the
- * per target ev_resolve event. Scheduled once for each target at
- * startup, * then repeated periodically for each unresolved host
- * and if tracking (-T) when TTL expires.
- */
-void
-target_resolve(int fd, short what, void *thunk)
-{
-	struct target *t = thunk;
-
-	if (!v4_flag) {
-		t->evdns_type = DNS_IPv6_AAAA;
-		evdns_base_resolve_ipv6(dns, t->host, 0,
-		    resolved_host, t);
-	} else {
-		t->evdns_type = DNS_IPv4_A;
-		evdns_base_resolve_ipv4(dns, t->host, 0,
-		    resolved_host, t);
-	}
 }
 
 /*
