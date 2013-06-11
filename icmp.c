@@ -24,6 +24,8 @@ extern int fd4;
 extern int fd6;
 void read_packet4(int fd, short what, void *thunk);
 void read_packet6(int fd, short what, void *thunk);
+int write_packet4(int fd, short what, void *thunk);
+int write_packet6(int fd, short what, void *thunk);
 void activatetarget(struct target *);
 void resolvetarget(int, short, void *);
 
@@ -94,4 +96,28 @@ probe_add(const char *line)
 	}
 	numtargets++;
 	return (t);
+}
+
+/*
+ * Send out a single probe for a target.
+ */
+void
+probe_send(struct target *t)
+{
+	int len;
+	int n;
+	if (sa(t)->sa_family == AF_INET6) {
+		n = write_packet6(fd6, 0, t);
+		len = ICMP6_MINLEN + datalen;
+	} else {
+		n = write_packet4(fd4, 0, t);
+		len = ICMP_MINLEN + datalen;
+	}
+	SETRES(t, 0, ' ');
+
+	if (n < 0) {
+		SETRES(t, 0, '!'); /* transmit error */
+	} else if (n != len) {
+		SETRES(t, 0, '$'); /* partial transmit */
+	}
 }

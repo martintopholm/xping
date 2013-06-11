@@ -291,8 +291,6 @@ void
 write_packet(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
-	int len;
-	int n;
 
 	/* Check packet count limit */
 	if (c_count && t->npkts >= c_count) {
@@ -334,20 +332,7 @@ write_packet(int fd, short what, void *thunk)
 	}
 
 	/* Transmit request */
-	if (sa(t)->sa_family == AF_INET6) {
-		n = write_packet6(fd6, what, thunk);
-		len = ICMP6_MINLEN + datalen;
-	} else {
-		n = write_packet4(fd4, what, thunk);
-		len = ICMP_MINLEN + datalen;
-	}
-	SETRES(t, 0, ' ');
-
-	if (n < 0) {
-		SETRES(t, 0, '!'); /* transmit error */
-	} else if (n != len) {
-		SETRES(t, 0, '$'); /* partial transmit */
-	}
+	probe_send(t);
 	t->npkts++;
 
 	/* Reschedule event if socket doesn't match address family. */

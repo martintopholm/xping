@@ -66,5 +66,7 @@ void report_cleanup(void);
 /* from icmp.c */
 void probe_setup();
 struct target *probe_add(const char *);
+void probe_send(struct target *);
+
 
 #endif /* !XPING_H */
