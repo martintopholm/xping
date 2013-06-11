@@ -126,7 +126,7 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
  * family mismatches.
  */
 void
-write_packet(int fd, short what, void *thunk)
+target_probe(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 
@@ -182,7 +182,7 @@ write_packet(int fd, short what, void *thunk)
 		}
 		t->ev_write = event_new(ev_base,
 		    (sa(t)->sa_family == AF_INET6 ? fd6 : fd4), EV_PERSIST,
-		    write_packet, t);
+		    target_probe, t);
 		event_add(t->ev_write, &tv_interval);
 	}
 
@@ -193,13 +193,13 @@ write_packet(int fd, short what, void *thunk)
  * Does the scheduling of periodic transmissions.
  */
 void
-write_first_packet(int fd, short what, void *thunk)
+target_probe_sched(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 
-	t->ev_write = event_new(ev_base, fd, EV_PERSIST, write_packet, t);
+	t->ev_write = event_new(ev_base, fd, EV_PERSIST, target_probe, t);
 	event_add(t->ev_write, &tv_interval);
-	write_packet(fd, what, thunk);
+	target_probe(fd, what, thunk);
 }
 
 /*
@@ -481,10 +481,10 @@ main(int argc, char *argv[])
 	DL_FOREACH(list, t) {
 		if (sa(t)->sa_family == AF_INET6) {
 			t->ev_write = event_new(ev_base, fd6, 0,
-			    write_first_packet, t);
+			    target_probe_sched, t);
 		} else {
 			t->ev_write = event_new(ev_base, fd4, 0,
-			    write_first_packet, t);
+			    target_probe_sched, t);
 		}
 		event_add(t->ev_write, &tv);
 		tv.tv_usec += 100*1000; /* target spacing: 100ms */

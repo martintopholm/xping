@@ -14,6 +14,7 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <event2/event.h>
