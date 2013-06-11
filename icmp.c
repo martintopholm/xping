@@ -24,7 +24,7 @@
 /* inherit stuff from xping.c */
 extern int fd4;
 extern int fd6;
-struct target *findtarget(int af, void *address);
+struct target *target_find(int af, void *address);
 void marktarget(struct target *t, int seq, int ch);
 
 char	outpacket[IP_MAXPACKET];
@@ -127,7 +127,7 @@ static void
 find_marktarget(int af, void *address, int seq, int ch)
 {
 	struct target *t;
-	t = findtarget(af, address);
+	t = target_find(af, address);
 	if (t == NULL)
 		return; /* unknown source address */
 	marktarget(t, seq, ch);

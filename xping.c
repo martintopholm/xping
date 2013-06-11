@@ -49,8 +49,8 @@ int	numcomplete = 0;
 struct target *hash = NULL;
 struct target *list = NULL;
 
-void activatetarget(struct target *);
-void deactivatetarget(struct target *);
+void target_activate(struct target *);
+void target_deactivate(struct target *);
 void resolvetarget(int, short, void *);
 
 void (*init)(void) = termio_init;
@@ -255,7 +255,7 @@ target_deactivate(struct target *t)
  * Lookup target in the hash table
  */
 struct target *
-findtarget(int af, void *address)
+target_find(int af, void *address)
 {
 	struct target *result;
 	union addr sa;
