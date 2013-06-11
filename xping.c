@@ -95,7 +95,7 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 			evutil_timerclear(&tv);
 			tv.tv_sec = 60; /* neg-TTL might be search domain's */
 			event_add(t->ev_resolve, &tv);
-			deactivatetarget(t);
+			target_deactivate(t);
 		}
 		return;
 	}
@@ -110,7 +110,7 @@ resolved_host(int result, char type, int count, int ttl, void *addresses,
 		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
 		    sizeof(sin(t)->sin_addr));
 	}
-	activatetarget(t);
+	target_activate(t);
 
 	/* Schedule new request, if tracking domain name */
 	if (T_flag) {
@@ -207,7 +207,7 @@ target_probe_sched(int fd, short what, void *thunk)
  * key already exists.
  */
 void
-activatetarget(struct target *t)
+target_activate(struct target *t)
 {
 	struct target *result;
 
@@ -228,7 +228,7 @@ activatetarget(struct target *t)
  * one (t) instead.
  */
 void
-deactivatetarget(struct target *t)
+target_deactivate(struct target *t)
 {
 	struct target *tmp, *t1;
 
@@ -242,7 +242,7 @@ deactivatetarget(struct target *t)
 				if (t1 == NULL) {
 					t1 = tmp;
 					t1->duplicate = NULL;
-					activatetarget(t1);
+					target_activate(t1);
 				} else {
 					tmp->duplicate = t1;
 				}
@@ -332,7 +332,7 @@ addtarget(const char *line)
 	if (t == NULL)
 		return -1;
 	if (t->resolved)
-		activatetarget(t);
+		target_activate(t);
 	else {
 		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
 		evutil_timerclear(&tv);
