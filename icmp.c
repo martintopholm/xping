@@ -11,6 +11,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
 #include <unistd.h>
@@ -22,10 +23,9 @@
 /* inherit stuff from xping.c */
 extern int fd4;
 extern int fd6;
-void read_packet4(int fd, short what, void *thunk);
-void read_packet6(int fd, short what, void *thunk);
 void activatetarget(struct target *);
 void resolvetarget(int, short, void *);
+void marktarget(int af, void *address, int seq, int ch);
 
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
@@ -118,6 +118,131 @@ write_packet6(int fd, short what, void *thunk)
 	icmp6h->icmp6_id = htons(ident);
 	return sendto(fd, outpacket6, len, 0, sa(t),
 	    sizeof(struct sockaddr_in6));
+}
+
+/*
+ * Receive packet from IPv4 socket, parse it and associate with an active
+ * target via marktarget.
+ */
+static void
+read_packet4(int fd, short what, void *thunk)
+{
+	char inpacket[IP_MAXPACKET];
+	struct sockaddr_in sin;
+	struct ip *ip;
+	struct ip *oip;
+	struct icmp *icp;
+	struct icmp *oicp;
+	socklen_t salen;
+	int hlen;
+	int seq;
+	int n;
+
+	salen = sizeof(sin);
+	memset(inpacket, 0, sizeof(inpacket));
+	n = recvfrom(fd, inpacket, sizeof(inpacket), 0,
+	    (struct sockaddr *)&sin, &salen);
+	if (n < 0) {
+		return;
+	}
+
+	ip = (struct ip *)inpacket;
+	hlen = ip->ip_hl << 2;
+	if (ip->ip_p != IPPROTO_ICMP) {
+		return;
+	}
+	if (n < hlen + ICMP_MINLEN) {
+		return;
+	}
+
+	icp = (struct icmp *)(inpacket + hlen);
+	if (icp->icmp_type == ICMP_ECHOREPLY) {
+		if (icp->icmp_id != htons(ident))
+			return; /*  skip other ping sessions */
+
+		seq = ntohs(icp->icmp_seq);
+		marktarget(AF_INET, &sin.sin_addr, seq, '.');
+	} else {
+		/* Skip short icmp error packets. */
+		if (n < ICMP_MINLEN * 2 + sizeof(struct ip))
+			return;
+
+		/* Check aspects of the original packet */
+		oip = (struct ip *)icp->icmp_data;
+		oicp = (struct icmp *)(oip + 1);
+		if (oip->ip_p != IPPROTO_ICMP)
+			return;
+		if (oicp->icmp_type != ICMP_ECHO)
+			return;
+		if (oicp->icmp_id != htons(ident))
+			return;
+
+		seq = ntohs(oicp->icmp_seq);
+		if (icp->icmp_type == ICMP_UNREACH)
+			marktarget(AF_INET, &oip->ip_dst, seq, '#');
+		else
+			marktarget(AF_INET, &oip->ip_dst, seq, '%');
+	}
+}
+
+/*
+ * Receive packet from IPv6 socket, parse it and associate with an active
+ * target via marktarget.
+ */
+static void
+read_packet6(int fd, short what, void *thunk)
+{
+	char inpacket[IP_MAXPACKET];
+	struct sockaddr_in6 sin6;
+	struct ip6_hdr *oip6;
+	struct icmp6_hdr *icmp6h;
+	struct icmp6_hdr *oicmp6h;
+	socklen_t salen;
+	int seq;
+	int n;
+
+	salen = sizeof(sin6);
+	memset(inpacket, 0, sizeof(inpacket));
+	n = recvfrom(fd, inpacket, sizeof(inpacket), 0,
+	    (struct sockaddr *)&sin6, &salen);
+	if (n < 0) {
+		return;
+	}
+	if (n < ICMP6_MINLEN) {
+		return;
+	}
+
+	/* SOCK_RAW for IPPROTO_ICMPV6 doesn't include IPv6 header */
+	icmp6h = (struct icmp6_hdr *)(inpacket);
+	if (icmp6h->icmp6_type == ICMP6_ECHO_REPLY) {
+		if (icmp6h->icmp6_id != htons(ident))
+			return; /*  skip other ping sessions */
+		if (n != sizeof(struct icmp6_hdr) + datalen)
+			return;
+
+		seq = ntohs(icmp6h->icmp6_seq);
+		marktarget(AF_INET6, &sin6.sin6_addr, seq, '.');
+	} else {
+		/* Skip short icmp error packets. */
+		if (n < ICMP6_MINLEN * 2 + sizeof(struct ip6_hdr))
+			return;
+
+		/* Check aspects of the original packet */
+		oip6 = (struct ip6_hdr *)(icmp6h + 1);
+		oicmp6h = (struct icmp6_hdr *)(oip6 + 1);
+		if (oip6->ip6_nxt != IPPROTO_ICMPV6)
+			return;
+		if (oicmp6h->icmp6_type != ICMP6_ECHO_REQUEST)
+			return;
+		if (oicmp6h->icmp6_id != htons(ident))
+			return;
+
+		seq = ntohs(oicmp6h->icmp6_seq);
+		if (icmp6h->icmp6_type == ICMP6_DST_UNREACH)
+			marktarget(AF_INET6, &oip6->ip6_dst, seq, '#');
+		else
+			marktarget(AF_INET6, &oip6->ip6_dst, seq, '%');
+	}
 }
 
 /*
