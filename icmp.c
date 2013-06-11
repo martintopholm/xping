@@ -25,7 +25,7 @@
 extern int fd4;
 extern int fd6;
 struct target *target_find(int af, void *address);
-void marktarget(struct target *t, int seq, int ch);
+void target_mark(struct target *t, int seq, int ch);
 
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
@@ -130,12 +130,12 @@ find_marktarget(int af, void *address, int seq, int ch)
 	t = target_find(af, address);
 	if (t == NULL)
 		return; /* unknown source address */
-	marktarget(t, seq, ch);
+	target_mark(t, seq, ch);
 }
 
 /*
  * Receive packet from IPv4 socket, parse it and associate result with
- * an active target via marktarget.
+ * an active target via find_marktarget.
  */
 static void
 read_packet4(int fd, short what, void *thunk)
@@ -200,7 +200,7 @@ read_packet4(int fd, short what, void *thunk)
 
 /*
  * Receive packet from IPv6 socket, parse it and associate with an active
- * target via marktarget.
+ * target via find_marktarget.
  */
 static void
 read_packet6(int fd, short what, void *thunk)

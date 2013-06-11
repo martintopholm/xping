@@ -51,7 +51,6 @@ struct target *list = NULL;
 
 void target_activate(struct target *);
 void target_deactivate(struct target *);
-void resolvetarget(int, short, void *);
 
 void (*init)(void) = termio_init;
 void (*update)(struct target *) = termio_update;
@@ -60,7 +59,8 @@ void (*cleanup)(void) = termio_cleanup;
 /*
  * Signal to catch program termination
  */
-void sigint(int sig)
+void
+sigint(int sig)
 {
 	event_base_loopexit(ev_base, NULL);
 	signal(SIGINT, SIG_DFL);
@@ -280,7 +280,7 @@ target_find(int af, void *address)
  * Mark a target and sequence with given symbol
  */
 void
-marktarget(struct target *t, int seq, int ch)
+target_mark(struct target *t, int seq, int ch)
 {
 	t->res[seq % NUM] = ch;
 	if (a_flag && ch == '.') {
@@ -304,7 +304,7 @@ marktarget(struct target *t, int seq, int ch)
  * and if tracking (-T) when TTL expires.
  */
 void
-resolvetarget(int fd, short what, void *thunk)
+target_resolve(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 
@@ -323,7 +323,7 @@ resolvetarget(int fd, short what, void *thunk)
  * Create a new a probe target, apply resolver if needed.
  */
 int
-addtarget(const char *line)
+target_add(const char *line)
 {
 	struct target *t;
 	struct timeval tv;
@@ -334,7 +334,7 @@ addtarget(const char *line)
 	if (t->resolved)
 		target_activate(t);
 	else {
-		t->ev_resolve = event_new(ev_base, -1, 0, resolvetarget, t);
+		t->ev_resolve = event_new(ev_base, -1, 0, target_resolve, t);
 		evutil_timerclear(&tv);
 		event_add(t->ev_resolve, &tv);
 	}
@@ -443,7 +443,7 @@ main(int argc, char *argv[])
 	/* Read targets from program arguments and/or stdin. */
 	list = NULL;
 	for (i=0; i<argc; i++) {
-		if (addtarget(argv[i]) < 0) {
+		if (target_add(argv[i]) < 0) {
 			perror("malloc");
 			return 1;
 		}
@@ -459,7 +459,7 @@ main(int argc, char *argv[])
 			}
 			if (buf[0] == '#' || len < 1)
 				continue;
-			if (addtarget(buf) < 0) {
+			if (target_add(buf) < 0) {
 				perror("malloc");
 				return 1;
 			}
