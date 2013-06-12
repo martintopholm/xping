@@ -41,11 +41,7 @@ struct	timeval tv_interval;
 int	numtargets = 0;
 int	numcomplete = 0;
 
-struct target *hash = NULL;
 struct target *list = NULL;
-
-void target_activate(struct target *);
-void target_deactivate(struct target *);
 
 void (*ui_init)(void) = termio_init;
 void (*ui_update)(struct target *) = termio_update;
@@ -90,22 +86,16 @@ target_is_resolved(int result, char type, int count, int ttl, void *addresses,
 			evutil_timerclear(&tv);
 			tv.tv_sec = 60; /* neg-TTL might be search domain's */
 			event_add(t->ev_resolve, &tv);
-			target_deactivate(t);
+			probe_resolved(t, 0, NULL);
 		}
 		return;
 	}
 
 	/* Lookup succeeded, set address in record */
-	if (t->evdns_type == DNS_IPv6_AAAA) {
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
-		    sizeof(sin6(t)->sin6_addr));
-	} else if (t->evdns_type == DNS_IPv4_A) {
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
-		    sizeof(sin(t)->sin_addr));
-	}
-	target_activate(t);
+	if (t->evdns_type == DNS_IPv6_AAAA)
+		probe_resolved(t, AF_INET6, addresses);
+	else if (t->evdns_type == DNS_IPv4_A)
+		probe_resolved(t, AF_INET, addresses);
 
 	/* Schedule new request, if tracking domain name */
 	if (T_flag) {
@@ -220,80 +210,6 @@ target_probe_sched(int fd, short what, void *thunk)
 }
 
 /*
- * Insert a new target into the hash table. Mark as a duplicate if the
- * key already exists.
- */
-void
-target_activate(struct target *t)
-{
-	struct target *result;
-
-	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
-	if (result == t)
-		; /* nothing, already active in hash */
-	else if (result)
-		t->duplicate = result;
-	else
-		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
-	t->resolved = 1;
-}
-
-/*
- * Remove a target (t) from the hash table if the target is the currently
- * active for the address. Secondly first target (t1) which was duplicate
- * of target (t) is activated, and other duplicates will refer of that
- * one (t) instead.
- */
-void
-target_deactivate(struct target *t)
-{
-	struct target *tmp, *t1;
-
-	t->resolved = 0;
-	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), tmp);
-	if (tmp == t) {
-		HASH_DELETE(hh, hash, t);
-		t1 = NULL;
-		DL_FOREACH(list, tmp) {
-			if (tmp->duplicate == t) {
-				if (t1 == NULL) {
-					t1 = tmp;
-					t1->duplicate = NULL;
-					target_activate(t1);
-				} else {
-					tmp->duplicate = t1;
-				}
-			}
-		}
-	}
-}
-
-/*
- * Lookup target in the hash table
- */
-struct target *
-target_find(int af, void *address)
-{
-	struct target *result;
-	union addr sa;
-
-	memset(&sa, 0, sizeof(sa));
-	if (af == AF_INET) {
-		sa.sin.sin_family = AF_INET;
-		memmove(&sa.sin.sin_addr, (struct in_addr *)address,
-		    sizeof(sa.sin.sin_addr));
-	} else if (af == AF_INET6) {
-		sa.sin6.sin6_family = AF_INET6;
-		memmove(&sa.sin6.sin6_addr, (struct in6_addr *)address,
-		    sizeof(sa.sin6.sin6_addr));
-	} else {
-		return NULL;
-	}
-	HASH_FIND(hh, hash, &sa, sizeof(union addr), result);
-	return (result);
-}
-
-/*
  * Mark a target and sequence with given symbol
  */
 void
@@ -326,9 +242,7 @@ target_add(const char *line)
 	t = probe_add(line);
 	if (t == NULL)
 		return -1;
-	if (t->resolved)
-		target_activate(t);
-	else {
+	if (!t->resolved) {
 		t->ev_resolve = event_new(ev_base, -1, 0, target_resolve, t);
 		evutil_timerclear(&tv);
 		event_add(t->ev_resolve, &tv);

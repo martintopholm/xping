@@ -26,9 +26,9 @@
 /* inherit stuff from xping.c */
 extern int fd4;
 extern int fd6;
-struct target *target_find(int af, void *address);
 void target_mark(struct target *t, int seq, int ch);
 
+struct target *hash = NULL;
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
 int	datalen = 56;
@@ -76,6 +76,78 @@ in_cksum(u_short *addr, int len)
 	sum += (sum >> 16);                     /* add carry */
 	answer = ~sum;                          /* truncate to 16 bits */
 	return(answer);
+}
+
+/*
+ * Insert a new target into the hash table. Mark as a duplicate if the
+ * key already exists.
+ */
+void
+activate(struct target *t)
+{
+	struct target *result;
+
+	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
+	if (result == t)
+		; /* nothing, already active in hash */
+	else if (result)
+		t->duplicate = result;
+	else
+		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
+}
+
+/*
+ * Remove a target (t) from the hash table if the target is the currently
+ * active for the address. Secondly first target (t1) which was duplicate
+ * of target (t) is activated, and other duplicates will refer of that
+ * one (t) instead.
+ */
+void
+deactivate(struct target *t)
+{
+	struct target *tmp, *t1;
+
+	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), tmp);
+	if (tmp == t) {
+		HASH_DELETE(hh, hash, t);
+		t1 = NULL;
+		DL_FOREACH(list, tmp) {
+			if (tmp->duplicate == t) {
+				if (t1 == NULL) {
+					t1 = tmp;
+					t1->duplicate = NULL;
+					activate(t1);
+				} else {
+					tmp->duplicate = t1;
+				}
+			}
+		}
+	}
+}
+
+/*
+ * Lookup target in the hash table
+ */
+struct target *
+find(int af, void *address)
+{
+	struct target *result;
+	union addr sa;
+
+	memset(&sa, 0, sizeof(sa));
+	if (af == AF_INET) {
+		sa.sin.sin_family = AF_INET;
+		memmove(&sa.sin.sin_addr, (struct in_addr *)address,
+		    sizeof(sa.sin.sin_addr));
+	} else if (af == AF_INET6) {
+		sa.sin6.sin6_family = AF_INET6;
+		memmove(&sa.sin6.sin6_addr, (struct in6_addr *)address,
+		    sizeof(sa.sin6.sin6_addr));
+	} else {
+		return NULL;
+	}
+	HASH_FIND(hh, hash, &sa, sizeof(union addr), result);
+	return (result);
 }
 
 /*
@@ -129,7 +201,7 @@ static void
 find_marktarget(int af, void *address, int seq, int ch)
 {
 	struct target *t;
-	t = target_find(af, address);
+	t = find(af, address);
 	if (t == NULL)
 		return; /* unknown source address */
 	target_mark(t, seq, ch);
@@ -314,8 +386,30 @@ probe_add(const char *line)
 			    sizeof(sin(t)->sin_addr));
 		}
 		t->resolved = 1;
+		activate(t);
 	}
 	return (t);
+}
+
+void
+probe_resolved(struct target *t, int af, void *addresses)
+{
+	if (af == AF_INET6) {
+		sin6(t)->sin6_family = AF_INET6;
+		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
+		    sizeof(sin6(t)->sin6_addr));
+		activate(t);
+		t->resolved = 1;
+	} else if (af == AF_INET) {
+		sin(t)->sin_family = AF_INET;
+		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
+		    sizeof(sin(t)->sin_addr));
+		activate(t);
+		t->resolved = 1;
+	} else if (af == 0) {
+		t->resolved = 0;
+		deactivate(t);
+	}
 }
 
 /*
