@@ -21,6 +21,8 @@
 
 #include "xping.h"
 
+#define ICMP6_MINLEN sizeof(struct icmp6_hdr)
+
 /* inherit stuff from xping.c */
 extern int fd4;
 extern int fd6;

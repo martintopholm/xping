@@ -8,12 +8,7 @@
  */
 
 #include <sys/param.h>
-
 #include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip6.h>
-#include <netinet/icmp6.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -72,7 +67,7 @@ sigint(int sig)
  * A-record instead. When resolving fails reschedule a new request either
  * by built-in delay. type isn't available for failed requests.
  */
-void
+static void
 target_is_resolved(int result, char type, int count, int ttl, void *addresses,
     void *thunk)
 {
@@ -126,7 +121,7 @@ target_is_resolved(int result, char type, int count, int ttl, void *addresses,
  * startup, * then repeated periodically for each unresolved host
  * and if tracking (-T) when TTL expires.
  */
-void
+static void
 target_resolve(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
@@ -147,7 +142,7 @@ target_resolve(int fd, short what, void *thunk)
  * request for target. Reschedules transmision if socket and address
  * family mismatches.
  */
-void
+static void
 target_probe(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
@@ -214,7 +209,7 @@ target_probe(int fd, short what, void *thunk)
 /*
  * Does the scheduling of periodic transmissions.
  */
-void
+static void
 target_probe_sched(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
@@ -322,7 +317,7 @@ target_mark(struct target *t, int seq, int ch)
 /*
  * Create a new a probe target, apply resolver if needed.
  */
-int
+static int
 target_add(const char *line)
 {
 	struct target *t;

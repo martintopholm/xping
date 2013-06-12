@@ -3,7 +3,6 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
-
 #include <netinet/in.h>
 
 #include <event2/event.h>
@@ -11,7 +10,6 @@
 #include "uthash.h"
 #include "utlist.h"
 
-#define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 #define NUM 300
 
 extern struct event_base *ev_base;
@@ -49,6 +47,8 @@ struct target {
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 
+void target_mark(struct target *, int, int);
+
 /* from "version.c" */
 extern const char version[];
 extern const char built[];
@@ -67,6 +67,5 @@ void report_cleanup(void);
 void probe_setup();
 struct target *probe_add(const char *);
 void probe_send(struct target *);
-
 
 #endif /* !XPING_H */
