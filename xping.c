@@ -52,9 +52,9 @@ struct target *list = NULL;
 void target_activate(struct target *);
 void target_deactivate(struct target *);
 
-void (*init)(void) = termio_init;
-void (*update)(struct target *) = termio_update;
-void (*cleanup)(void) = termio_cleanup;
+void (*ui_init)(void) = termio_init;
+void (*ui_update)(struct target *) = termio_update;
+void (*ui_cleanup)(void) = termio_cleanup;
 
 /*
  * Signal to catch program termination
@@ -172,7 +172,7 @@ target_probe(int fd, short what, void *thunk)
 	if (!t->resolved) {
 		SETRES(t, 0, '@');
 		t->npkts++;
-		update(t);
+		ui_update(t);
 		return;
 	}
 
@@ -188,7 +188,7 @@ target_probe(int fd, short what, void *thunk)
 		    GETRES(t, -2) != '.' &&
 		    GETRES(t, -1) != '.')
 			write(STDOUT_FILENO, "\a", 1);
-		update(t);
+		ui_update(t);
 	}
 
 	/* Transmit request */
@@ -208,7 +208,7 @@ target_probe(int fd, short what, void *thunk)
 		event_add(t->ev_write, &tv_interval);
 	}
 
-	update(t);
+	ui_update(t);
 }
 
 /*
@@ -316,7 +316,7 @@ target_mark(struct target *t, int seq, int ch)
 			write(STDOUT_FILENO, "\a", 1);
 	}
 
-	update(t);
+	ui_update(t);
 }
 
 /*
@@ -466,9 +466,9 @@ main(int argc, char *argv[])
 		}
 	}
 	if (!isatty(STDOUT_FILENO)) {
-		init = report_init;
-		update = report_update;
-		cleanup = report_cleanup;
+		ui_init = report_init;
+		ui_update = report_update;
+		ui_cleanup = report_cleanup;
 	}
 	if (list == NULL) {
 		usage("no arguments");
@@ -495,9 +495,9 @@ main(int argc, char *argv[])
 	/* Startup UI and probing */
 	signal(SIGINT, sigint);
 	signal(SIGTERM, sigint);
-	init();
+	ui_init();
 	event_base_dispatch(ev_base);
-	cleanup();
+	ui_cleanup();
 
 	close(fd4);
 	close(fd6);
