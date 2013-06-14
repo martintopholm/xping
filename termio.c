@@ -69,6 +69,7 @@ move(int row, int col)
 		fprintf(stdout, "%c[%dB", 0x1b, row);
 	if (col > 0)
 		fprintf(stdout, "%c[%dC", 0x1b, col);
+	cursor_y = row;
 }
 
 static void
@@ -127,16 +128,18 @@ scrolldown(int n)
 #endif
 
 /*
- * Window changed: move up from current line to the "first" line, clear
- * screen and redraw. XXX: we may continue in the middle of an update,
- * so we should probably just make a new reference point and schedule an
- * immediate update after signal processing.
+ * Window changed: move up from current line (cursor_y) to the "first"
+ * line to the origin row (cursor_y = 0), clear screen and redraw.
+ * We may continue in the middle of an update, but even so the rest of the
+ * interrupted update will use the new reference point for its move().
  */
 #ifndef NCURSES
 void
 sigwinch(int sig)
 {
-	scrollup(cursor_y);
+	if (cursor_y > 0)
+		fprintf(stdout, "%c[%dA\r", 0x1b, cursor_y);
+	fprintf(stdout, "\r%c[s", 0x1b);
 	cursor_y = 0;
 	fprintf(stdout, "%c[2K\r", 0x1b);
 	clrtobot();
@@ -153,33 +156,33 @@ updatesingle(int ifirst, struct target *selective)
 	i = 0;
 	DL_FOREACH(list, t) {
 		if (t == selective) {
-			move(cursor_y = i, 20+(t->npkts-1-ifirst));
+			move(i, 20+(t->npkts-1-ifirst));
 			addch(t->res[(t->npkts-1) % NUM]);
 		}
 		i++;
 	}
-	move(cursor_y = i, 0);
+	move(i, 0);
 }
 
 static void
 updatefull(int ifirst, int ilast)
 {
 	struct target *t;
+	int row;
 	int i;
 
-	cursor_y = 0;
-	move(cursor_y, 0);
+	row = 0;
 	DL_FOREACH(list, t) {
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			mvprintw(cursor_y, 0, "%c[2;32m%19.19s%c[0m ",
+			mvprintw(row, 0, "%c[2;32m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
 		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			mvprintw(cursor_y, 0, "%c[2;31m%19.19s%c[0m ",
+			mvprintw(row, 0, "%c[2;31m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
 		else
-			mvprintw(cursor_y, 0, "%19.19s ", t->host);
+			mvprintw(row, 0, "%19.19s ", t->host);
 		if (t->duplicate != NULL)
-			mvprintw(cursor_y, 20, "(duplicate of %s)", t->duplicate->host);
+			mvprintw(row, 20, "(duplicate of %s)", t->duplicate->host);
 		else {
 			for (i=ifirst; i<ilast; i++) {
 				if (i < t->npkts)
@@ -188,12 +191,13 @@ updatefull(int ifirst, int ilast)
 					addch(' ');
 			}
 		}
-		move(++cursor_y, 0);
+		move(++row, 0);
 	}
 }
 
 /*
- * Prepares the terminal for drawing
+ * Prepares the terminal for drawing. For !NCURSES this means handling
+ * window resize, output buffering, scroll issues and other output mangling.
  */
 void
 termio_init(void)
@@ -214,12 +218,19 @@ termio_init(void)
 		perror("malloc");
 
 	/* Reserve space on terminal */
-	DL_FOREACH(list, t)
+	cursor_y = 0;
+	DL_FOREACH(list, t) {
 		cursor_y++;
-	scrolldown(cursor_y);
+		scrolldown(1);
+	}
+	scrollup(cursor_y);
 
-	fprintf(stdout, "%c[7l", 0x1b); /* disable wrapping */
+	/* Establish reference point for move() */
+	fprintf(stdout, "\r%c[s", 0x1b);
+	cursor_y = 0;
 
+	/* Avoid mangling output by disabling input echo and wrapping */
+	fprintf(stdout, "%c[7l", 0x1b);
 	if (isatty(STDOUT_FILENO) && tcgetattr(STDOUT_FILENO, &oterm) == 0) {
 		memcpy(&term, &oterm, sizeof(term));
 		term.c_lflag &= ~(ECHO | ECHONL);
@@ -240,14 +251,6 @@ termio_update(struct target *selective)
 	int col;
 
 	int imax, ifirst, ilast;
-#ifndef NCURSES
-	int i;
-
-	/* Establish reference point on "first" output line */
-	for (i=0; i < cursor_y; i++)
-		fprintf(stdout, "%cM", 0x1b);
-	fprintf(stdout, "\r%c[s", 0x1b);
-#endif /* !NCURSES */
 
 	t = list;
 	if (t == NULL)
@@ -262,15 +265,22 @@ termio_update(struct target *selective)
 	if (selective != NULL && ifirst == ifirst_state) {
 		updatesingle(ifirst, selective);
 	} else {
+#ifndef NCURSES
+		/* Re-establish the reference point for move() */
+		if (cursor_y > 0)
+			fprintf(stdout, "%c[%dA\r", 0x1b, cursor_y);
+		fprintf(stdout, "\r%c[s", 0x1b);
+		cursor_y = 0;
+#endif /* !NCURSES */
 		updatefull(ifirst, ilast);
 		ifirst_state = ifirst;
+		clrtoeol();
+		clrtobot();
 	}
-	clrtoeol();
 #ifdef NCURSES
-	mvprintw(++cursor_y, 0, "NCURSES");
-	move(++cursor_y, 0);
+	mvprintw(cursor_y + 1, 0, "NCURSES");
+	move(cursor_y + 1, 0);
 #endif /* NCURSES */
-	clrtobot();
 	refresh();
 }
 
