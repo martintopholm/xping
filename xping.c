@@ -130,9 +130,7 @@ target_resolve(int fd, short what, void *thunk)
 }
 
 /*
- * Register status for send and "timed out" requests and send appropriate
- * request for target. Reschedules transmision if socket and address
- * family mismatches.
+ * Register status for send and "timed out" requests and send a probe.
  */
 static void
 target_probe(int fd, short what, void *thunk)
@@ -182,19 +180,6 @@ target_probe(int fd, short what, void *thunk)
 	probe_send(t);
 	t->npkts++;
 
-	/* Reschedule event if socket doesn't match address family. */
-	if ((sa(t)->sa_family == AF_INET6 && fd == fd4) ||
-	    (sa(t)->sa_family == AF_INET && fd == fd6)) {
-		if (t->ev_write) {
-			event_del(t->ev_write);
-			event_free(t->ev_write);
-		}
-		t->ev_write = event_new(ev_base,
-		    (sa(t)->sa_family == AF_INET6 ? fd6 : fd4), EV_PERSIST,
-		    target_probe, t);
-		event_add(t->ev_write, &tv_interval);
-	}
-
 	ui_update(t);
 }
 
@@ -206,7 +191,7 @@ target_probe_sched(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 
-	t->ev_write = event_new(ev_base, fd, EV_PERSIST, target_probe, t);
+	t->ev_write = event_new(ev_base, -1, EV_PERSIST, target_probe, t);
 	event_add(t->ev_write, &tv_interval);
 	target_probe(fd, what, thunk);
 }
@@ -390,13 +375,7 @@ main(int argc, char *argv[])
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 	DL_FOREACH(list, t) {
-		if (sa(t)->sa_family == AF_INET6) {
-			t->ev_write = event_new(ev_base, fd6, 0,
-			    target_probe_sched, t);
-		} else {
-			t->ev_write = event_new(ev_base, fd4, 0,
-			    target_probe_sched, t);
-		}
+		t->ev_write = event_new(ev_base, -1, 0, target_probe_sched, t);
 		event_add(t->ev_write, &tv);
 		tv.tv_usec += 100*1000; /* target spacing: 100ms */
 		tv.tv_sec += (tv.tv_usec >= 1000000 ? 1 : 0);
