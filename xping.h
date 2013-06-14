@@ -36,6 +36,8 @@ struct target {
 	struct event	*ev_write;
 	struct target	*duplicate;
 
+	int		row;
+
 	UT_hash_handle	hh;
 	struct target	*prev, *next;
 };

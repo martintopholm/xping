@@ -25,7 +25,8 @@
 
 #include "xping.h"
 
-static int ifirst_state;
+static int ifirst_state = -1;
+static int holding_row = 0;
 
 #ifndef NCURSES
 static int cursor_y;
@@ -148,20 +149,11 @@ sigwinch(int sig)
 #endif /* !NCURSES */
 
 static void
-updatesingle(int ifirst, struct target *selective)
+updatesingle(int ifirst, struct target *t)
 {
-	struct target *t;
-	int i;
-
-	i = 0;
-	DL_FOREACH(list, t) {
-		if (t == selective) {
-			move(i, 20+(t->npkts-1-ifirst));
-			addch(t->res[(t->npkts-1) % NUM]);
-		}
-		i++;
-	}
-	move(i, 0);
+	move(t->row, 20+(t->npkts-1-ifirst));
+	addch(t->res[(t->npkts-1) % NUM]);
+	move(holding_row, 0);
 }
 
 static void
@@ -173,6 +165,7 @@ updatefull(int ifirst, int ilast)
 
 	row = 0;
 	DL_FOREACH(list, t) {
+		t->row = row; /* cache for selective updates */
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
 			mvprintw(row, 0, "%c[2;32m%19.19s%c[0m ",
 			    0x1b, t->host, 0x1b);
@@ -193,6 +186,7 @@ updatefull(int ifirst, int ilast)
 		}
 		move(++row, 0);
 	}
+	holding_row = row;
 }
 
 /*
@@ -202,7 +196,6 @@ updatefull(int ifirst, int ilast)
 void
 termio_init(void)
 {
-	ifirst_state = -1;
 #ifndef NCURSES
 	struct termios term;
 	struct target *t;
