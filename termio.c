@@ -286,6 +286,41 @@ termio_cleanup(void)
 	if (isatty(STDIN_FILENO))
 		tcsetattr(STDIN_FILENO, TCSAFLUSH, &oterm); // XXX: TCASOFT? see openssh
 #else /* NCURSES */
+	struct target *t;
+	int col, i;
+	int imax, ifirst, ilast;
+
+	t = list;
+	if (t == NULL)
+		return;
+
+	col = getmaxx(stdscr);
+	imax = MIN(t->npkts, col - 20);
+	imax = MIN(imax, NUM);
+	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
+	ilast = t->npkts;
+
 	endwin();
+	DL_FOREACH(list, t) {
+		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
+			fprintf(stdout, "%c[2;32m%19.19s%c[0m ",
+			    0x1b, t->host, 0x1b);
+		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
+			fprintf(stdout, "%c[2;31m%19.19s%c[0m ",
+			    0x1b, t->host, 0x1b);
+		else
+			fprintf(stdout, "%19.19s ", t->host);
+		if (t->duplicate != NULL)
+			fprintf(stdout, "(duplicate of %s)", t->duplicate->host);
+		else {
+			for (i=ifirst; i<ilast; i++) {
+				if (i < t->npkts)
+					fputc(t->res[i % NUM], stdout);
+				else
+					fputc(' ', stdout);
+			}
+		}
+		fputc('\n', stdout);
+	}
 #endif /* !NCURSES */
 }
