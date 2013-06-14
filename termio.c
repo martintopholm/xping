@@ -277,10 +277,6 @@ termio_update(struct target *selective)
 		clrtoeol();
 		clrtobot();
 	}
-#ifdef NCURSES
-	mvprintw(cursor_y + 1, 0, "NCURSES");
-	move(cursor_y + 1, 0);
-#endif /* NCURSES */
 	refresh();
 }
 
