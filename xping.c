@@ -87,6 +87,7 @@ target_is_resolved(int result, char type, int count, int ttl, void *addresses,
 			tv.tv_sec = 60; /* neg-TTL might be search domain's */
 			event_add(t->ev_resolve, &tv);
 			probe_resolved(t, 0, NULL);
+			ui_update(NULL);
 		}
 		return;
 	}
@@ -96,6 +97,7 @@ target_is_resolved(int result, char type, int count, int ttl, void *addresses,
 		probe_resolved(t, AF_INET6, addresses);
 	else if (t->evdns_type == DNS_IPv4_A)
 		probe_resolved(t, AF_INET, addresses);
+	ui_update(NULL);
 
 	/* Schedule new request, if tracking domain name */
 	if (T_flag) {
