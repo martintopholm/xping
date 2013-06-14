@@ -25,10 +25,10 @@
 
 #include "xping.h"
 
-static int cursor_y;
 static int ifirst_state;
 
 #ifndef NCURSES
+static int cursor_y;
 static char *scrbuffer;
 struct termios oterm;
 
