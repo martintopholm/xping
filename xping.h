@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include <assert.h>
 #include <event2/event.h>
 
 #include "uthash.h"
@@ -16,6 +17,8 @@ extern struct event_base *ev_base;
 extern struct target *list;
 extern int C_flag;
 extern int numtargets;
+extern int fd4, fd4errno;
+extern int fd6, fd6errno;
 
 union addr {
 	struct sockaddr sa;
@@ -37,6 +40,12 @@ struct target {
 	struct target	*duplicate;
 
 	int		row;
+
+	/* icmp-unpriv. */
+	int		pid;
+	int		fd;
+	int		seqdelta;
+	struct evbuffer	*evbuf;
 
 	UT_hash_handle	hh;
 	struct target	*prev, *next;

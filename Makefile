@@ -10,7 +10,7 @@ MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I/usr/local/include
 LDFLAGS=-L/usr/local/lib -L/usr/local/lib/event2
 DEPS=check-libevent
-OBJS=xping.o termio.o report.o version.o icmp.o
+OBJS=xping.o termio.o report.o version.o
 LIBS=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || date +snapshot-%Y%m%dT%H%M%S`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
@@ -29,7 +29,7 @@ TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 .PHONY: version.o
 
-all: xping xping.8.gz
+all: xping xping.8.gz xping-unpriv
 
 check-libevent:
 	@/bin/echo -n 'Checking for libevent... '; \
@@ -69,8 +69,11 @@ version.o:
 	 printf "const char built[] = \"%s\";\n" $(TIMESTAMP)) | \
 	 $(CC) -x c -c -o version.o -
 
-xping: $(DEPS) $(OBJS)
-	$(CC) $(LDFLAGS) -g -o xping $(OBJS) $(LIBS)
+xping: $(DEPS) $(OBJS) icmp.o
+	$(CC) $(LDFLAGS) -g -o xping icmp.o $(OBJS) $(LIBS)
+
+xping-unpriv: $(DEPS) $(OBJS) icmp-unpriv.o
+	$(CC) $(LDFLAGS) -g -o xping-unpriv icmp-unpriv.o $(OBJS) $(LIBS)
 
 xping.8.gz: xping.8
 	gzip -c xping.8 > xping.8.gz
@@ -82,9 +85,11 @@ install:
 	install -m 444 xping.8.gz $(MANPATH)/man8/
 
 clean:
-	rm -f check-libevent check-curses xping xping.8.gz $(OBJS)
+	rm -f check-libevent check-curses xping xping.8.gz xping-unpriv icmp.o icmp-unpriv.o $(OBJS)
 
 # Object dependencies (gcc -MM *.c)
+icmp.o: icmp.c xping.h uthash.h utlist.h
+icmp-unpriv.o: icmp-unpriv.c xping.h uthash.h utlist.h
 report.o: report.c xping.h uthash.h utlist.h
 termio.o: termio.c xping.h uthash.h utlist.h
 xping.o: xping.c xping.h uthash.h utlist.h

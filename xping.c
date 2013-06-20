@@ -10,6 +10,7 @@
 #include <sys/param.h>
 #include <netinet/in.h>
 
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,8 +34,8 @@ int	v4_flag = 0;
 int	v6_flag = 0;
 
 /* Global structures */
-int	fd4;
-int	fd6;
+int	fd4, fd4errno;
+int	fd6, fd6errno;
 struct	event_base *ev_base;
 struct	evdns_base *dns;
 struct	timeval tv_interval;
@@ -270,16 +271,10 @@ main(int argc, char *argv[])
 
 	/* Open RAW-socket and drop root-privs */
 	fd4 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+	fd4errno = errno;
 	fd6 = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+	fd6errno = errno;
 	setuid(getuid());
-	if (fd4 < 0) {
-		perror("socket");
-		return 1;
-	}
-	if (fd6 < 0) {
-		perror("socket (IPv6)");
-		return 1;
-	}
 
 	/* Parse command line options */
 	while ((ch = getopt(argc, argv, "46ACTac:i:hV")) != -1) {

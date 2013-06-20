@@ -14,6 +14,7 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -340,6 +341,17 @@ probe_setup()
 {
 	struct event *ev;
 	int i;
+
+	if (fd4 < 0) {
+		errno = fd4errno;
+		perror("socket (IPv4)");
+		exit(1);
+	}
+	if (fd6 < 0) {
+		errno = fd6errno;
+		perror("socket (IPv6)");
+		exit(1);
+	}
 
 	/* Prepare datapacket */
 	ident = getpid() & 0xffff;
