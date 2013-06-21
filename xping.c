@@ -155,16 +155,15 @@ target_probe(int fd, short what, void *thunk)
 
 	/* Unresolved request */
 	if (!t->resolved) {
-		SETRES(t, 0, '@');
 		t->npkts++;
-		ui_update(t);
+		target_mark(t, t->npkts - 1, '@');
 		return;
 	}
 
 	/* Missed request */
 	if (t->npkts > 0 && GETRES(t, -1) != '.') {
 		if (GETRES(t, -1) == ' ')
-			SETRES(t, -1, '?');
+			target_mark(t, t->npkts - 1, '?');
 		if (A_flag == 1)
 			write(STDOUT_FILENO, "\a", 1);
 		else if (A_flag >= 2 &&
@@ -173,7 +172,6 @@ target_probe(int fd, short what, void *thunk)
 		    GETRES(t, -2) != '.' &&
 		    GETRES(t, -1) != '.')
 			write(STDOUT_FILENO, "\a", 1);
-		ui_update(t);
 	}
 
 	/* Transmit request */
@@ -214,7 +212,10 @@ target_mark(struct target *t, int seq, int ch)
 			write(STDOUT_FILENO, "\a", 1);
 	}
 
-	ui_update(t);
+	if (seq == t->npkts - 1)
+		ui_update(t);
+	else
+		ui_update(NULL); /* this is a late reply, need full update to redraw this */
 }
 
 /*
