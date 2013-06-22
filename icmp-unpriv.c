@@ -10,6 +10,7 @@
 #include <sys/param.h>
 
 #include <regex.h>
+#include <signal.h>
 #include <unistd.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
@@ -18,8 +19,6 @@
 
 static regex_t re_reply, re_other;
 
-/* FIXME: shut down a fork'ed ping */
-/* FIXME: shut pings down on program exit */
 static void
 killping(struct target *t)
 {
@@ -128,16 +127,29 @@ probe_add(const char *line)
 	return (t);
 }
 
+/*
+ * Store newly resolved address in target struct (or if af == 0
+ * unresolved). Only change address and reset probe if address actually
+ * changed.
+ */
 void
 probe_resolved(struct target *t, int af, void *addresses)
 {
 	if (af == AF_INET6) {
+		if (sin6(t)->sin6_family == AF_INET6 &&
+		    memcmp(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
+		    sizeof(sin6(t)->sin6_addr)) == 0)
+			return;
 		sin6(t)->sin6_family = AF_INET6;
 		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
 		    sizeof(sin6(t)->sin6_addr));
 		killping(t);
 		t->resolved = 1;
 	} else if (af == AF_INET) {
+		if (sin(t)->sin_family == AF_INET &&
+		    memcmp(&sin(t)->sin_addr, (struct in_addr *)addresses,
+		    sizeof(sin(t)->sin_addr)) == 0)
+			return;
 		sin(t)->sin_family = AF_INET;
 		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
 		    sizeof(sin(t)->sin_addr));
