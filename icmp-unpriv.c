@@ -79,12 +79,12 @@ void
 probe_setup(struct event_base *parent_event_base)
 {
 	signal(SIGCHLD, SIG_IGN);
-	if (regcomp(&re_reply, "64 bytes.*seq=([0-9][0-9]*) ",
+	if (regcomp(&re_reply, "[0-9]+ bytes.*seq=([0-9][0-9]*) ",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
-	if (regcomp(&re_other, "From .*icmp_seq=([0-9][0-9]*) "
+	if (regcomp(&re_other, "From .*icmp_seq=([0-9][0-9]*)"
             "( Destination Host Unreachable| Destination unreachable| )",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
