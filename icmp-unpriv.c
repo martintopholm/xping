@@ -53,6 +53,7 @@ readping(int fd, short what, void *thunk)
 	char buf[BUFSIZ];
 	char *end;
 	long int seq;
+	int mark;
 	int n;
 
 	evbuffer_read(t->evbuf, fd, 512);
@@ -61,15 +62,23 @@ readping(int fd, short what, void *thunk)
 		len += evbufptr.pos;
 		n = evbuffer_remove(t->evbuf, buf, MIN(sizeof(buf)-1, len));
 		buf[n] = '\0';
+		mark = '\0';
 		if (regexec(&re_reply, buf, 5, match, 0) == 0) {
-			seq = strtol(buf + match[1].rm_so, &end, 10) + t->seqdelta;
-			target_mark(t, seq, '.');
+			seq = strtol(buf + match[1].rm_so, &end, 10);
+			mark = '.';
 		} else if (regexec(&re_other, buf, 5, match, 0) == 0) {
-			seq = strtol(buf + match[1].rm_so, &end, 10) + t->seqdelta;
+			seq = strtol(buf + match[1].rm_so, &end, 10);
 			if (match[2].rm_so != match[2].rm_eo)
-				target_mark(t, seq, '#');
+				mark = '#';
 			else
-				target_mark(t, seq, '%');
+				mark = '%';
+		}
+		if (mark != '\0') {
+			/* Adjust sequence adjustment delta. In cast the
+			 * first packet has icmp_seq=0 instead of 1 */
+			if (t->npkts < 32768 && seq == 0)
+				t->seqdelta++;
+			target_mark(t, seq + t->seqdelta, mark);
 		}
 		evbufptr = evbuffer_search_eol(t->evbuf, NULL, &len, EVBUFFER_EOL_LF);
 	}
