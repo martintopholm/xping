@@ -32,13 +32,16 @@ static void
 execping(struct target *t)
 {
 	char address[64];
+	char interval[24];
+
+	evutil_snprintf(interval, sizeof(interval), "%f", (double)i_interval/1000);
 
 	if (sa(t)->sa_family == AF_INET6) {
 		evutil_inet_ntop(sa(t)->sa_family, &sin6(t)->sin6_addr, address, sizeof(address));
-		execlp("ping6", "ping6", "-n", address, NULL);
+		execlp("ping6", "ping6", "-ni", interval, address, NULL);
 	} else {
 		evutil_inet_ntop(sa(t)->sa_family, &sin(t)->sin_addr, address, sizeof(address));
-		execlp("ping", "ping", "-n", address, NULL);
+		execlp("ping", "ping", "-ni", interval, address, NULL);
 	}
 	exit(1); /* in case exec fails */
 }
