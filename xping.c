@@ -298,6 +298,8 @@ main(int argc, char *argv[])
 			break;
 		case 'c':
 			c_count = strtol(optarg, &end, 10);
+			if (*optarg != '\0' && *end != '\0')
+				usage("Invalid count");
 			break;
 		case 'T':
 			T_flag = 1;
