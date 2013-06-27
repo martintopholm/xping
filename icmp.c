@@ -155,9 +155,8 @@ find(int af, void *address)
  * Send out icmp packet for target.
  */
 static int
-write_packet4(int fd, short what, void *thunk)
+write_packet4(struct sockaddr *sa, unsigned short seq)
 {
-	struct target *t = thunk;
 	struct icmp *icp;
 	int len;
 
@@ -166,11 +165,11 @@ write_packet4(int fd, short what, void *thunk)
 	icp->icmp_type = ICMP_ECHO;
 	icp->icmp_code = 0;
 	icp->icmp_cksum = 0;
-	icp->icmp_seq = htons(t->npkts);
+	icp->icmp_seq = htons(seq);
 	icp->icmp_id = htons(ident);
 	icp->icmp_cksum = in_cksum((u_short *)icp, len);
 
-	return sendto(fd, outpacket, len, 0, sa(t),
+	return sendto(fd4, outpacket, len, 0, sa,
 	    sizeof(struct sockaddr_in));
 }
 
@@ -178,9 +177,8 @@ write_packet4(int fd, short what, void *thunk)
  * Send out icmp6 packet for target.
  */
 static int
-write_packet6(int fd, short what, void *thunk)
+write_packet6(struct sockaddr *sa, unsigned short seq)
 {
-	struct target *t = thunk;
 	struct icmp6_hdr *icmp6h;
 	int len;
 
@@ -189,9 +187,9 @@ write_packet6(int fd, short what, void *thunk)
 	icmp6h->icmp6_type = ICMP6_ECHO_REQUEST;
 	icmp6h->icmp6_code = 0;
 	icmp6h->icmp6_cksum = 0;
-	icmp6h->icmp6_seq = htons(t->npkts);
+	icmp6h->icmp6_seq = htons(seq);
 	icmp6h->icmp6_id = htons(ident);
-	return sendto(fd, outpacket6, len, 0, sa(t),
+	return sendto(fd6, outpacket6, len, 0, sa,
 	    sizeof(struct sockaddr_in6));
 }
 
@@ -428,15 +426,15 @@ probe_resolved(struct target *t, int af, void *addresses)
  * Send out a single probe for a target.
  */
 void
-probe_send(struct target *t)
+probe_send(struct target *t, int seq)
 {
 	int len;
 	int n;
 	if (sa(t)->sa_family == AF_INET6) {
-		n = write_packet6(fd6, 0, t);
+		n = write_packet6(sa(t), seq & 0xffff);
 		len = ICMP6_MINLEN + datalen;
 	} else {
-		n = write_packet4(fd4, 0, t);
+		n = write_packet4(sa(t), seq & 0xffff);
 		len = ICMP_MINLEN + datalen;
 	}
 	SETRES(t, 0, ' ');

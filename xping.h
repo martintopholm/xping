@@ -79,6 +79,6 @@ void report_cleanup(void);
 void probe_setup();
 struct target *probe_add(const char *);
 void probe_resolved(struct target *, int, void *);
-void probe_send(struct target *);
+void probe_send(struct target *, int);
 
 #endif /* !XPING_H */

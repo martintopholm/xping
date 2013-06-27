@@ -17,7 +17,7 @@
 
 #include "xping.h"
 
-static regex_t re_reply, re_other;
+static regex_t re_reply, re_other, re_xmiterr;
 
 static void
 killping(struct target *t)
@@ -174,7 +174,7 @@ probe_resolved(struct target *t, int af, void *addresses)
 }
 
 void
-probe_send(struct target *t)
+probe_send(struct target *t, int seq)
 {
 	struct event *ev;
 	int pair[2];
@@ -193,7 +193,7 @@ probe_send(struct target *t)
 		SETRES(t, 0, '!'); /* transmit error */
 		return;
 	}
-	t->seqdelta = t->npkts - 1;
+	t->seqdelta = seq - 1; /* linux ping(8) begins icmp_seq=1 */
 	evutil_make_socket_nonblocking(pair[0]);
 	ev = event_new(ev_base, pair[0], EV_READ|EV_PERSIST, readping, t);
 	event_add(ev, NULL);

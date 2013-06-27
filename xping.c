@@ -176,7 +176,7 @@ target_probe(int fd, short what, void *thunk)
 	}
 
 	/* Transmit request */
-	probe_send(t);
+	probe_send(t, t->npkts);
 	t->npkts++;
 
 	ui_update(t);
