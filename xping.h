@@ -46,6 +46,7 @@ struct target {
 	int		pid;
 	int		fd;
 	int		seqdelta;
+	int		seqlast;
 	struct evbuffer	*evbuf;
 
 	UT_hash_handle	hh;

@@ -75,11 +75,15 @@ readping(int fd, short what, void *thunk)
 				mark = '#';
 			else
 				mark = '%';
+		} else if (regexec(&re_xmiterr, buf, 5, match, 0) == 0) {
+			/* Transmit errors are quickly identified,
+			 * thus assume they refer to most recent packet */
+			target_mark(t, t->seqlast, '!');
 		}
 		if (mark != '\0') {
 			/* Adjust sequence adjustment delta. In cast the
 			 * first packet has icmp_seq=0 instead of 1 */
-			if (t->npkts < 32768 && seq == 0)
+			if (t->seqlast < 32768 && seq == 0)
 				t->seqdelta++;
 			target_mark(t, seq + t->seqdelta, mark);
 		}
@@ -97,7 +101,13 @@ probe_setup(struct event_base *parent_event_base)
 		exit(1);
 	}
 	if (regcomp(&re_other, "From .*icmp_seq=([0-9][0-9]*)"
-            "( Destination Host Unreachable| Destination unreachable| )",
+	    "( Destination Host Unreachable| Destination unreachable| )",
+	    REG_EXTENDED | REG_NEWLINE) != 0) {
+		fprintf(stderr, "regcomp: error compiling regular expression\n");
+		exit(1);
+	}
+	if (regcomp(&re_xmiterr, "(ping|ping6|connect): "
+	    "(sentto|UDP connect|sendmsg|Network is unreachable)",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
 		exit(1);
@@ -179,6 +189,11 @@ probe_send(struct target *t, int seq)
 	struct event *ev;
 	int pair[2];
 	pid_t pid;
+
+	/* Save most recent sequence number to close gap between
+	 * probe_send returning (target_probe increasing npkts) and forked
+	 * program outputting */
+	t->seqlast = seq;
 
 	/* Clear ahead to avoid overwriting a result in case of small
 	 * timing indiscrepancies */
