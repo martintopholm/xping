@@ -11,6 +11,7 @@
 
 #include <regex.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
@@ -52,6 +53,7 @@ readping(int fd, short what, void *thunk)
 	struct target *t = thunk;
 	regmatch_t match[5];
 	struct evbuffer_ptr evbufptr;
+	double rtt;
 	size_t len;
 	char buf[BUFSIZ];
 	char *end;
@@ -68,6 +70,7 @@ readping(int fd, short what, void *thunk)
 		mark = '\0';
 		if (regexec(&re_reply, buf, 5, match, 0) == 0) {
 			seq = strtol(buf + match[1].rm_so, &end, 10);
+			rtt = strtod(buf + match[2].rm_so, &end);
 			mark = '.';
 		} else if (regexec(&re_other, buf, 5, match, 0) == 0) {
 			seq = strtol(buf + match[1].rm_so, &end, 10);
@@ -86,6 +89,16 @@ readping(int fd, short what, void *thunk)
 			if (t->seqlast < 32768 && seq == 0)
 				t->seqdelta++;
 			target_mark(t, seq + t->seqdelta, mark);
+
+			/* Check for timing drift: If packet isn't the
+			 * latest reply and ping thinks rtt is less than
+			 * i_interval it must have drifted */
+			if (mark == '.' &&
+			    seq + t->seqdelta < t->seqlast &&
+			    rtt < i_interval) {
+				killping(t);
+				target_mark(t, t->seqlast, '!');
+			}
 		}
 		evbufptr = evbuffer_search_eol(t->evbuf, NULL, &len, EVBUFFER_EOL_LF);
 	}
@@ -95,7 +108,8 @@ void
 probe_setup(struct event_base *parent_event_base)
 {
 	signal(SIGCHLD, SIG_IGN);
-	if (regcomp(&re_reply, "[0-9]+ bytes.*seq=([0-9][0-9]*) ",
+	if (regcomp(&re_reply,
+	    "[0-9]+ bytes.*seq=([0-9][0-9]*) .*time=([0-9].[0-9]*)",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
 		exit(1);
