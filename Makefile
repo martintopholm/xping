@@ -70,10 +70,10 @@ version.o:
 	 $(CC) -x c -c -o version.o -
 
 xping: $(DEPS) $(OBJS) icmp.o
-	$(CC) $(LDFLAGS) -g -o xping icmp.o $(OBJS) $(LIBS)
+	$(CC) $(LDFLAGS) -o xping icmp.o $(OBJS) $(LIBS)
 
 xping-unpriv: $(DEPS) $(OBJS) icmp-unpriv.o
-	$(CC) $(LDFLAGS) -g -o xping-unpriv icmp-unpriv.o $(OBJS) $(LIBS)
+	$(CC) $(LDFLAGS) -o xping-unpriv icmp-unpriv.o $(OBJS) $(LIBS)
 
 xping.8.gz: xping.8
 	gzip -c xping.8 > xping.8.gz
