@@ -9,6 +9,7 @@
 
 #include <sys/param.h>
 #include <netinet/in.h>
+#include <net/if.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -264,6 +265,7 @@ main(int argc, char *argv[])
 	char buf[BUFSIZ];
 	struct timeval tv;
 	struct target *t;
+	char *device = NULL;
 	char *end;
 	int i;
 	int len;
@@ -277,7 +279,7 @@ main(int argc, char *argv[])
 	setuid(getuid());
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46ACTac:i:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ACTI:ac:i:hV")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
@@ -295,6 +297,9 @@ main(int argc, char *argv[])
 			break;
 		case 'C':
 			C_flag = 1;
+			break;
+		case 'I':
+			device = optarg;
 			break;
 		case 'c':
 			c_count = strtol(optarg, &end, 10);
@@ -323,6 +328,19 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+
+	if (device != NULL) {
+#ifdef SO_BINDTODEVICE
+		if(setsockopt(fd4, SOL_SOCKET, SO_BINDTODEVICE, device, strlen(device)+1) < 0) {
+			perror("setsockopt(SO_BINDTODEVICE)");
+			return 1;
+		}
+#else /* !SO_BINDTODEVICE */
+		(void)device;
+		fprintf(stderr, "SO_BINDTODEVICE not supported\n");
+		return 1;
+#endif /* SO_BINDTODEVICE */
+	}
 
 	tv_interval.tv_sec = i_interval / 1000;
 	tv_interval.tv_usec = i_interval % 1000 * 1000;
