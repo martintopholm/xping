@@ -6,10 +6,10 @@ using ICMP-ECHO. As packets are received dots are printed on the screen.
 Hosts not responding before next packet is due will get a questionmark
 in the display:
 
-       192.0.2.1 .....................................
-       192.0.2.2 ????.????????????.???.?.?............
-       192.0.2.3 .....................................
-       192.0.2.4 .....................................
+           192.0.2.1 .....................................
+           192.0.2.2 ????.????????????.???.?.?............
+           192.0.2.3 .....................................
+           192.0.2.4 .....................................
 
 It is similar to the second visual display in "my traceroute's" (aka mtr)
 and provide a way to spot subtle availability changes.
@@ -38,6 +38,14 @@ when it has opened the sockets.
 
 Changes
 -------
+
+v1.1+
+
+  * unprivileged icmp-unpriv module
+  * split out icmp function in seperate module
+  * ui improvements (selective updates, disable local-echo)
+  * probe count (to limit execution)
+  * report generation (when stdout is a file)
 
 v1.1
 

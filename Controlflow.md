@@ -1,7 +1,7 @@
 FLOW
 ----
 
-Below is a diagram outlining control flow within xping.c::
+Below is a diagram outlining control flow within xping.c:
 
     main()                 [xping.c]                      |       [icmp.c]
       |                                                   |
