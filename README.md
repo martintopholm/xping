@@ -39,7 +39,7 @@ when it has opened the sockets.
 Changes
 -------
 
-v1.1+
+v1.2
 
   * unprivileged icmp-unpriv module
   * split out icmp function in seperate module
