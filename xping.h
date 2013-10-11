@@ -49,6 +49,10 @@ struct target {
 	int		seqlast;
 	struct evbuffer	*evbuf;
 
+	/* http */
+	unsigned short	port;
+	char		query[64];
+
 	UT_hash_handle	hh;
 	struct target	*prev, *next;
 };

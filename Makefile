@@ -29,7 +29,7 @@ TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 .PHONY: version.o
 
-all: xping xping.8.gz xping-unpriv
+all: xping xping.8.gz xping-unpriv xping-http
 
 check-libevent:
 	@/bin/echo -n 'Checking for libevent... '; \
@@ -75,6 +75,9 @@ xping: $(DEPS) $(OBJS) icmp.o
 xping-unpriv: $(DEPS) $(OBJS) icmp-unpriv.o
 	$(CC) $(LDFLAGS) -o xping-unpriv icmp-unpriv.o $(OBJS) $(LIBS)
 
+xping-http: $(DEPS) $(OBJS) http.o
+	$(CC) $(LDFLAGS) -o xping-http http.o $(OBJS) $(LIBS)
+
 xping.8.gz: xping.8
 	gzip -c xping.8 > xping.8.gz
 
@@ -85,7 +88,9 @@ install:
 	install -m 444 xping.8.gz $(MANPATH)/man8/
 
 clean:
-	rm -f check-libevent check-curses xping xping.8.gz xping-unpriv icmp.o icmp-unpriv.o $(OBJS)
+	rm -f check-libevent check-curses \
+	      xping xping.8.gz xping-http xping-unpriv \
+	      http.o icmp.o icmp-unpriv.o $(OBJS)
 
 # Object dependencies (gcc -MM *.c)
 icmp.o: icmp.c xping.h uthash.h utlist.h
