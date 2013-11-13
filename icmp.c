@@ -15,6 +15,7 @@
 #include <netinet/icmp6.h>
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -378,8 +379,10 @@ probe_add(const char *line)
 	int salen;
 
 	t = malloc(sizeof(*t));
-	if (t == NULL)
+	if (t == NULL) {
+		perror("malloc");
 		return (t);
+	}
 	memset(t, 0, sizeof(*t));
 	memset(t->res, ' ', sizeof(t->res));
 	strncat(t->host, line, sizeof(t->host) - 1);

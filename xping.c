@@ -338,7 +338,6 @@ main(int argc, char *argv[])
 	list = NULL;
 	for (i=0; i<argc; i++) {
 		if (target_add(argv[i]) < 0) {
-			perror("malloc");
 			return 1;
 		}
 	}
