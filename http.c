@@ -173,14 +173,27 @@ session_timeout(int fd, short what, void *thunk)
 
 /*
  * Prepare datastructures needed for probe
+ *  1. protocol
+ *  2. separator, protocol
+ *  3. hostname
+ *  4. separator, forced address
+ *  5. address
+ *  6. port
+ *  7. url
  */
+#define RE_PROTO 1
+#define RE_HOST 3
+#define RE_FORCED 5
+#define RE_PORT 6
+#define RE_URL 7
+#define RE_MAX 8
 void
 probe_setup()
 {
 	tv_timeout.tv_sec = 3 * i_interval / 1000;
 	tv_timeout.tv_usec = 3 * i_interval % 1000 * 1000;
 	if (regcomp(&re_target,
-	    "^(http:(//)?)?([0-9A-Za-z.-]+)(:[0-9]+)?(/[^ ]*)?$",
+	    "^(http:(//)?)?([0-9A-Za-z.-]+)(\\[([0-9A-Fa-f.:]+)\\])?(:[0-9]+)?(/[^ ]*)?$",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
 		exit(1);
@@ -235,11 +248,12 @@ probe_add(const char *line)
 	union addr sa;
 	int salen;
 	int port;
-	regmatch_t match[6];
+	regmatch_t match[RE_MAX];
+	char forced[512];
 	char *end;
 	int i, j;
 
-	if (regexec(&re_target, line, 6, match, 0) != 0) {
+	if (regexec(&re_target, line, RE_MAX, match, 0) != 0) {
 		fprintf(stderr, "probe_add: can't parse %.128s\n", line);
 		return NULL;
 	}
@@ -251,16 +265,17 @@ probe_add(const char *line)
 	}
 	memset(t->res, ' ', sizeof(t->res));
 
-	strncat(t->host, line + match[3].rm_so,
-	    MIN(sizeof(t->host) - 1, match[3].rm_eo - match[3].rm_so));
-	if (match[4].rm_so  != -1)
-		port = strtol(line + match[4].rm_so + 1, &end, 10);
+	strncat(t->host, line + match[RE_HOST].rm_so,
+	    MIN(sizeof(t->host) - 1,
+	    match[RE_HOST].rm_eo - match[RE_HOST].rm_so));
+	if (match[RE_PORT].rm_so  != -1)
+		port = strtol(line + match[RE_PORT].rm_so + 1, &end, 10);
 	else
 		port = 80;
 
 	/* t->query NULL termination is provided by calloc */
-	if (match[5].rm_so != -1)
-		for (i = match[5].rm_so, j = 0; i < match[5].rm_eo &&
+	if (match[RE_URL].rm_so != -1)
+		for (i = match[RE_URL].rm_so, j = 0; i < match[RE_URL].rm_eo &&
 		    j + 3 < sizeof(t->query) - 1; i++) {
 			const char *src = &line[i];
 			if (uri_chars[(unsigned char)*src])
@@ -275,18 +290,46 @@ probe_add(const char *line)
 	else
 		t->query[0] = '/';
 
-	/* Check for literal ip address in hostname field */
+	/*
+	 * Check for presence of forced address e.g. example.com[127.0.0.1].
+	 * If present parse the address or return an error. Otherwise
+	 * check the hostname for an ip literal, if it doesn't parse
+	 * leave it to target_add to resolve.
+	 */
 	salen = sizeof(sa);
-	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
-		sa(t)->sa_family = sa.sa.sa_family;
-		if (sa.sa.sa_family == AF_INET6) {
-			memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
-			    sizeof(sin6(t)->sin6_addr));
+	if (match[RE_FORCED].rm_so != -1) {
+		forced[0] = '\0';
+		strncat(forced, line + match[RE_FORCED].rm_so,
+		    MIN(sizeof(forced) - 1,
+		    match[RE_FORCED].rm_eo - match[RE_FORCED].rm_so));
+		if (evutil_parse_sockaddr_port(forced, &sa.sa, &salen) == 0) {
+			sa(t)->sa_family = sa.sa.sa_family;
+			if (sa.sa.sa_family == AF_INET6) {
+				memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
+				    sizeof(sin6(t)->sin6_addr));
+			} else {
+				memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
+				    sizeof(sin(t)->sin_addr));
+			}
+			t->resolved = 1;
 		} else {
-			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
-			    sizeof(sin(t)->sin_addr));
+			fprintf(stderr, "probe_add: can't parse %.128s\n",
+			    line);
+			return NULL;
 		}
-		t->resolved = 1;
+	} else {
+		salen = sizeof(sa);
+		if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
+			sa(t)->sa_family = sa.sa.sa_family;
+			if (sa.sa.sa_family == AF_INET6) {
+				memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
+				    sizeof(sin6(t)->sin6_addr));
+			} else {
+				memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
+				    sizeof(sin(t)->sin_addr));
+			}
+			t->resolved = 1;
+		}
 	}
 	sin(t)->sin_port = htons(port);
 	DL_APPEND(list, t);
