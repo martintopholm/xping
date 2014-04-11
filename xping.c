@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <event2/event.h>
@@ -47,9 +48,9 @@ int	numcomplete = 0;
 
 struct target *list = NULL;
 
-void (*ui_init)(void) = termio_init;
-void (*ui_update)(struct target *) = termio_update;
-void (*ui_cleanup)(void) = termio_cleanup;
+void (*ui_init)(void) = dummy_init;
+void (*ui_update)(struct target *) = dummy_update;
+void (*ui_cleanup)(void) = dummy_cleanup;
 
 /*
  * Signal to catch program termination
@@ -204,6 +205,19 @@ target_probe_sched(int fd, short what, void *thunk)
 void
 target_mark(struct target *t, int seq, int ch)
 {
+	time_t ts;
+	struct tm *tm;
+	char timebuf[256];
+
+	ts = time(NULL);
+	tm = gmtime(&ts);
+	strftime(timebuf, sizeof(timebuf), "%Y%m%dT%H%M%S", tm);
+
+	if (ch != '.') {
+		fprintf(stdout, "%s %c\n", timebuf, ch);
+		fflush(stdout);
+	}
+
 	t->res[seq % NUM] = ch;
 	if (a_flag && ch == '.') {
 		if (a_flag == 1)
@@ -369,11 +383,6 @@ main(int argc, char *argv[])
 				return 1;
 			}
 		}
-	}
-	if (!isatty(STDOUT_FILENO)) {
-		ui_init = report_init;
-		ui_update = report_update;
-		ui_cleanup = report_cleanup;
 	}
 	if (list == NULL) {
 		usage("no arguments");

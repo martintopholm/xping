@@ -78,6 +78,11 @@ void report_init(void);
 void report_update(struct target *);
 void report_cleanup(void);
 
+/* from dummy.c */
+void dummy_init(void);
+void dummy_update(struct target *);
+void dummy_cleanup(void);
+
 /* from icmp.c */
 void probe_setup();
 struct target *probe_add(const char *);
