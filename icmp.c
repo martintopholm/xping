@@ -25,11 +25,6 @@
 
 #define ICMP6_MINLEN sizeof(struct icmp6_hdr)
 
-/* inherit stuff from xping.c */
-extern int fd4;
-extern int fd6;
-void target_mark(struct target *t, int seq, int ch);
-
 struct target *hash = NULL;
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
@@ -433,6 +428,7 @@ probe_send(struct target *t, int seq)
 {
 	int len;
 	int n;
+
 	if (sa(t)->sa_family == AF_INET6) {
 		n = write_packet6(sa(t), seq & 0xffff);
 		len = ICMP6_MINLEN + datalen;
@@ -440,11 +436,11 @@ probe_send(struct target *t, int seq)
 		n = write_packet4(sa(t), seq & 0xffff);
 		len = ICMP_MINLEN + datalen;
 	}
-	SETRES(t, 0, ' ');
+	target_unmark(t, seq);
 
 	if (n < 0) {
-		SETRES(t, 0, '!'); /* transmit error */
+		target_mark(t, seq, '!'); /* transmit error */
 	} else if (n != len) {
-		SETRES(t, 0, '$'); /* partial transmit */
+		target_mark(t, seq, '$'); /* partial transmit */
 	}
 }

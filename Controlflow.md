@@ -13,13 +13,13 @@ Below is a diagram outlining control flow within xping.c:
       |             |                                     |                       ||
       |             '->> target_is_resolved --------------|--> probe_resolved     ||
       |                   |                               |      |--> activate <--'|
-      |                   '-> ui_update <---,             |      '--> deactivate   |
-      |                        ^            |             |                        |
-      |->> target_probe_sched  |            |             |                        |
-      |         |              |            |             |                        |
-      |         '->> target_probe ---------(--------------|--> probe_send          |
-      |                                     |             |                        |
-      |--> ui_init                         target_mark <--|--- read_packet <<------'
+      |                   '-> ui_update                   |      '--> deactivate   |
+      |                        ^    ^                     |                        |
+      |->> target_probe_sched  |    |   target_unmark <---|--------,               |
+      |         |              |    |                     |        |               |
+      |         '->> target_probe --(---------------------|--> probe_send          |
+      |                             |                     |                        |
+      |--> ui_init                  '-- target_mark <-----|--- read_packet <<------'
       |                                                   |
       '--> event_base_dispatch                            |
 

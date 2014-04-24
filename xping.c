@@ -23,6 +23,9 @@
 
 #include "xping.h"
 
+#define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
+#define GETRES(t,i) t->res[(t->npkts+i) % NUM]
+
 /* Option flags */
 int	i_interval = 1000;
 int	a_flag = 0;
@@ -217,6 +220,15 @@ target_mark(struct target *t, int seq, int ch)
 		ui_update(t);
 	else
 		ui_update(NULL); /* this is a late reply, need full update to redraw this */
+}
+
+/*
+ * Clear a mark, used before sending a new probe
+ */
+void
+target_unmark(struct target *t, int seq)
+{
+	t->res[seq % NUM] = ' ';
 }
 
 /*

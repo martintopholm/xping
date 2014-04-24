@@ -214,7 +214,7 @@ probe_send(struct target *t, int seq)
 
 	/* Clear ahead to avoid overwriting a result in case of small
 	 * timing indiscrepancies */
-	SETRES(t, 1, ' ');
+	target_unmark(t, seq+1);
 
 	/* Check for existing ping process */
 	if (t->pid && kill(t->pid, 0) == 0)
@@ -222,7 +222,7 @@ probe_send(struct target *t, int seq)
 
 	/* Create ipc socket pair and fork ping process */
 	if (evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, pair) < 0) {
-		SETRES(t, 0, '!'); /* transmit error */
+		target_mark(t, seq, '!'); /* transmit error */
 		return;
 	}
 	t->seqdelta = seq - 1; /* linux ping(8) begins icmp_seq=1 */
@@ -231,7 +231,7 @@ probe_send(struct target *t, int seq)
 	event_add(ev, NULL);
 	switch (pid = fork()) {
 	case -1:
-		SETRES(t, 0, '!'); /* transmit error */
+		target_mark(t, seq, '!'); /* transmit error */
 		return;
 	case 0:
 		evutil_closesocket(pair[0]);
