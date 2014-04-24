@@ -366,6 +366,7 @@ void probe_send(struct target *t, int seq)
 	char buf[512];
 	int salen;
 
+	target_unmark(t, seq);
 	session = calloc(1, sizeof(*session));
 	if (session == NULL) {
 		target_mark(t, seq, '!');
