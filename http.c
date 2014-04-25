@@ -332,6 +332,7 @@ probe_add(const char *line)
 		}
 	}
 	sin(t)->sin_port = htons(port);
+	t->comment = strdup(line);
 	DL_APPEND(list, t);
 	return (t);
 }

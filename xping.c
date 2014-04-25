@@ -214,7 +214,7 @@ target_mark(struct target *t, int seq, int ch)
 	strftime(timebuf, sizeof(timebuf), "%Y%m%dT%H%M%S", tm);
 
 	if (ch != '.') {
-		fprintf(stdout, "%s %c\n", timebuf, ch);
+		fprintf(stdout, "%s %s %c\n", timebuf, t->comment, ch);
 		fflush(stdout);
 	}
 

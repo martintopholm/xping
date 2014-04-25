@@ -52,6 +52,7 @@ struct target {
 	/* http */
 	unsigned short	port;
 	char		query[64];
+	char		*comment;
 
 	UT_hash_handle	hh;
 	struct target	*prev, *next;
