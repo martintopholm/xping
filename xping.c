@@ -333,7 +333,9 @@ main(int argc, char *argv[])
 #ifdef SO_BINDTODEVICE
 		if(setsockopt(fd4, SOL_SOCKET, SO_BINDTODEVICE, device, strlen(device)+1) < 0) {
 			perror("setsockopt(SO_BINDTODEVICE)");
-			return 1;
+		}
+		if(setsockopt(fd6, SOL_SOCKET, SO_BINDTODEVICE, device, strlen(device)+1) < 0) {
+			perror("setsockopt(SO_BINDTODEVICE)");
 		}
 #else /* !SO_BINDTODEVICE */
 		(void)device;
