@@ -62,7 +62,8 @@ session_send(struct session *session)
 	    "GET %s HTTP/1.1\r\n"
 	    "Host: %s\r\n"
 	    "Connection: close\r\n"
-	    "\r\n", session->t->query, session->t->host);
+	    "User-Agent: xping/%s\r\n"
+	    "\r\n", session->t->query, session->t->host, version);
 }
 
 /*
