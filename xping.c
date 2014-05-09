@@ -382,7 +382,7 @@ main(int argc, char *argv[])
 	/* Initial scheduling with increasing delay, distributes
 	 * transmissions across the interval and gives a cascading effect. */
 	tv.tv_sec = 0;
-	tv.tv_usec = 0;
+	tv.tv_usec = 100*1000;
 	DL_FOREACH(list, t) {
 		t->ev_write = event_new(ev_base, -1, 0, target_probe_sched, t);
 		event_add(t->ev_write, &tv);
