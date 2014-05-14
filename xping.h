@@ -39,6 +39,7 @@ struct target {
 	struct target	*duplicate;
 
 	int		row;
+	int		af;
 
 	/* icmp-unpriv. */
 	int		pid;
@@ -61,6 +62,7 @@ struct target {
 
 void target_mark(struct target *, int, int);
 void target_unmark(struct target *, int);
+void target_resolved(struct target *, int, void *);
 
 /* from "version.c" */
 extern const char version[];
@@ -79,7 +81,6 @@ void report_cleanup(void);
 /* from icmp.c */
 void probe_setup();
 struct target *probe_add(const char *);
-void probe_resolved(struct target *, int, void *);
 void probe_send(struct target *, int);
 
 /* from dnstask.c */

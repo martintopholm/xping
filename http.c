@@ -170,6 +170,29 @@ session_timeout(int fd, short what, void *thunk)
 }
 
 /*
+ * Resolving of target complete store resolved address.
+ */
+static void
+resolved(int af, void *address, void *thunk)
+{
+	struct target *t = thunk;
+	if (af == AF_INET6) {
+		sin6(t)->sin6_family = AF_INET6;
+		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(t)->sin6_addr));
+		t->resolved = 1;
+	} else if (af == AF_INET) {
+		sin(t)->sin_family = AF_INET;
+		memmove(&sin(t)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(t)->sin_addr));
+		t->resolved = 1;
+	} else if (af == 0) {
+		t->resolved = 0;
+	}
+	target_resolved(t, af, address);
+}
+
+/*
  * Prepare datastructures needed for probe
  *  1. protocol
  *  2. separator, protocol
@@ -327,32 +350,16 @@ probe_add(const char *line)
 				    sizeof(sin(t)->sin_addr));
 			}
 			t->resolved = 1;
+		} else {
+			if (dnstask_new(t->host, resolved, t) == NULL) {
+				free(t);
+				return NULL;
+			}
 		}
 	}
 	sin(t)->sin_port = htons(port);
 	DL_APPEND(list, t);
 	return (t);
-}
-
-/*
- * Resolving of target complete store resolved address.
- */
-void
-probe_resolved(struct target *t, int af, void *addresses)
-{
-	if (af == AF_INET6) {
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
-		    sizeof(sin6(t)->sin6_addr));
-		t->resolved = 1;
-	} else if (af == AF_INET) {
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
-		    sizeof(sin(t)->sin_addr));
-		t->resolved = 1;
-	} else if (af == 0) {
-		t->resolved = 0;
-	}
 }
 
 /*

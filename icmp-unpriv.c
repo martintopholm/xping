@@ -106,6 +106,42 @@ readping(int fd, short what, void *thunk)
 }
 
 /*
+ * Store newly resolved address in target struct (or if af == 0
+ * unresolved). Only change address and reset probe if address actually
+ * changed.
+ */
+static void
+resolved(int af, void *address, void *thunk)
+{
+	struct target *t = thunk;
+	if (af == AF_INET6) {
+		if (sin6(t)->sin6_family == AF_INET6 &&
+		    memcmp(&sin6(t)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(t)->sin6_addr)) == 0)
+			return;
+		sin6(t)->sin6_family = AF_INET6;
+		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(t)->sin6_addr));
+		killping(t);
+		t->resolved = 1;
+	} else if (af == AF_INET) {
+		if (sin(t)->sin_family == AF_INET &&
+		    memcmp(&sin(t)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(t)->sin_addr)) == 0)
+			return;
+		sin(t)->sin_family = AF_INET;
+		memmove(&sin(t)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(t)->sin_addr));
+		killping(t);
+		t->resolved = 1;
+	} else if (af == 0) {
+		t->resolved = 0;
+		killping(t);
+	}
+	target_resolved(t, af, address);
+}
+
+/*
  * Set up regular expressions for matching reply lines, unreachable lines,
  * and send errors.
  *
@@ -178,42 +214,13 @@ probe_add(const char *line)
 			    sizeof(sin(t)->sin_addr));
 		}
 		t->resolved = 1;
+	} else {
+		if (dnstask_new(t->host, resolved, t) == NULL) {
+			free(t);
+			return NULL;
+		}
 	}
 	return (t);
-}
-
-/*
- * Store newly resolved address in target struct (or if af == 0
- * unresolved). Only change address and reset probe if address actually
- * changed.
- */
-void
-probe_resolved(struct target *t, int af, void *addresses)
-{
-	if (af == AF_INET6) {
-		if (sin6(t)->sin6_family == AF_INET6 &&
-		    memcmp(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
-		    sizeof(sin6(t)->sin6_addr)) == 0)
-			return;
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)addresses,
-		    sizeof(sin6(t)->sin6_addr));
-		killping(t);
-		t->resolved = 1;
-	} else if (af == AF_INET) {
-		if (sin(t)->sin_family == AF_INET &&
-		    memcmp(&sin(t)->sin_addr, (struct in_addr *)addresses,
-		    sizeof(sin(t)->sin_addr)) == 0)
-			return;
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)addresses,
-		    sizeof(sin(t)->sin_addr));
-		killping(t);
-		t->resolved = 1;
-	} else if (af == 0) {
-		t->resolved = 0;
-		killping(t);
-	}
 }
 
 void

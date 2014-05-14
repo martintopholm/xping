@@ -166,12 +166,12 @@ target_unmark(struct target *t, int seq)
 }
 
 /*
- * Helper correcting argument order for callback functions.
+ * Target resolved update address family
  */
-static
-void dnstask_helper(int af, void *addr, void *thunk)
+void
+target_resolved(struct target *t, int af, void *address)
 {
-	probe_resolved(thunk, af, addr);
+	t->af = af;
 	ui_update(NULL);
 }
 
@@ -186,9 +186,6 @@ target_add(const char *line)
 	t = probe_add(line);
 	if (t == NULL)
 		return -1;
-	if (!t->resolved) {
-		t->dnstask = dnstask_new(t->host, dnstask_helper, t);
-	}
 	numtargets++;
 	return 0;
 }

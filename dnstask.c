@@ -130,11 +130,17 @@ dnstask_new(const char *hostname, dnstask_cb_type cb, void *thunk)
 	struct timeval tv;
 
 	task = calloc(1, sizeof(*task));
+	if (task == NULL)
+		return NULL;
 	assert(strlen(hostname) + 1 <= sizeof(task->host));
 	strncat(task->host, hostname, sizeof(task->host) - 1);
 	task->cb = cb;
 	task->thunk = thunk;
 	task->ev_resolve = event_new(ev_base, -1, 0, sendquery, task);
+	if (task->ev_resolve == NULL) {
+		free(task);
+		return NULL;
+	}
 	evutil_timerclear(&tv);
 	event_add(task->ev_resolve, &tv);
 	return task;
