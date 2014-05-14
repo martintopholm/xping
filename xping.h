@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <assert.h>
 #include <event2/event.h>
 
 #include "uthash.h"
@@ -30,13 +29,12 @@ union addr {
 struct target {
 	char		host[64];
 	int		resolved;
-	int		evdns_type;
 
 	union addr	sa;
 	int		npkts;
 	char		res[NUM+1];
 
-	struct event	*ev_resolve;
+	struct dnstask	*dnstask;
 	struct event	*ev_write;
 	struct target	*duplicate;
 
@@ -83,5 +81,10 @@ void probe_setup();
 struct target *probe_add(const char *);
 void probe_resolved(struct target *, int, void *);
 void probe_send(struct target *, int);
+
+/* from dnstask.c */
+typedef void (*dnstask_cb_type)(int, void *, void *);
+struct dnstask *dnstask_new(const char *, dnstask_cb_type, void *);
+void dnstask_free(struct dnstask *);
 
 #endif /* !XPING_H */

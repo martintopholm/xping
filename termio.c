@@ -174,10 +174,10 @@ updatefull(int ifirst, int ilast)
 	row = 0;
 	DL_FOREACH(list, t) {
 		t->row = row; /* cache for selective updates */
-		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
+		if (C_flag && t->dnstask && sa(t)->sa_family == AF_INET6)
 			mvprintw(row, 0, "%c[2;32m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
-		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
+		else if (C_flag && t->dnstask && sa(t)->sa_family == AF_INET)
 			mvprintw(row, 0, "%c[2;31m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
 		else
@@ -317,10 +317,10 @@ termio_cleanup(void)
 
 	endwin();
 	DL_FOREACH(list, t) {
-		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
+		if (C_flag && t->dnstask && sa(t)->sa_family == AF_INET6)
 			fprintf(stdout, "%c[2;32m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
-		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
+		else if (C_flag && t->dnstask && sa(t)->sa_family == AF_INET)
 			fprintf(stdout, "%c[2;31m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
 		else

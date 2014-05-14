@@ -10,7 +10,7 @@ MANPATH=$(PREFIX)/man
 CFLAGS+=-Wall -Werror -I/usr/local/include
 LDFLAGS+=-L/usr/local/lib -L/usr/local/lib/event2
 DEPS+=check-libevent.c
-OBJS+=termio.o report.o version.o
+OBJS+=termio.o report.o version.o dnstask.o
 LIBS+=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.3.1`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
@@ -101,6 +101,7 @@ clean:
 	      $(OBJS)
 
 # Object dependencies (gcc -MM *.c)
+dnstask.o: dnstask.c
 http.o: http.c xping.h uthash.h utlist.h
 icmp.o: icmp.c xping.h uthash.h utlist.h
 icmp-unpriv.o: icmp-unpriv.c xping.h uthash.h utlist.h

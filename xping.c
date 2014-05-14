@@ -65,77 +65,6 @@ sigint(int sig)
 }
 
 /*
- * Callback for resolved domain names. On missing AAAA-record retry for
- * A-record instead. When resolving fails reschedule a new request either
- * by built-in delay. type isn't available for failed requests.
- */
-static void
-target_is_resolved(int result, char type, int count, int ttl, void *addresses,
-    void *thunk)
-{
-	struct target *t = thunk;
-	struct timeval tv;
-
-	/*
-	 * If request for AAAA-record failed (NXDOMAIN, SERVFAIL, et al),
-	 * retry for A-record. Otherwise reschedule a new request.
-	 * All diagnostics about the failed request are useless, since
-	 * they might refer to a search domain request, which is done
-	 * transparently after the real request.
-	 */
-	if (result != DNS_ERR_NONE || count <= 0) {
-		if (t->evdns_type == DNS_IPv6_AAAA && !v6_flag) {
-			t->evdns_type = DNS_IPv4_A;
-			evdns_base_resolve_ipv4(dns, t->host, 0,
-			    target_is_resolved, t);
-		} else {
-			evutil_timerclear(&tv);
-			tv.tv_sec = 60; /* neg-TTL might be search domain's */
-			event_add(t->ev_resolve, &tv);
-			probe_resolved(t, 0, NULL);
-			ui_update(NULL);
-		}
-		return;
-	}
-
-	/* Lookup succeeded, set address in record */
-	if (t->evdns_type == DNS_IPv6_AAAA)
-		probe_resolved(t, AF_INET6, addresses);
-	else if (t->evdns_type == DNS_IPv4_A)
-		probe_resolved(t, AF_INET, addresses);
-	ui_update(NULL);
-
-	/* Schedule new request, if tracking domain name */
-	if (T_flag) {
-		evutil_timerclear(&tv);
-		tv.tv_sec = MAX(ttl, 1); /* enforce min-TTL */
-		event_add(t->ev_resolve, &tv);
-	}
-}
-
-/*
- * Sends out a DNS query for target through evdns. Called by the
- * per target ev_resolve event. Scheduled once for each target at
- * startup, * then repeated periodically for each unresolved host
- * and if tracking (-T) when TTL expires.
- */
-static void
-target_resolve(int fd, short what, void *thunk)
-{
-	struct target *t = thunk;
-
-	if (!v4_flag) {
-		t->evdns_type = DNS_IPv6_AAAA;
-		evdns_base_resolve_ipv6(dns, t->host, 0,
-		    target_is_resolved, t);
-	} else {
-		t->evdns_type = DNS_IPv4_A;
-		evdns_base_resolve_ipv4(dns, t->host, 0,
-		    target_is_resolved, t);
-	}
-}
-
-/*
  * Register status for send and "timed out" requests and send a probe.
  */
 static void
@@ -237,21 +166,28 @@ target_unmark(struct target *t, int seq)
 }
 
 /*
+ * Helper correcting argument order for callback functions.
+ */
+static
+void dnstask_helper(int af, void *addr, void *thunk)
+{
+	probe_resolved(thunk, af, addr);
+	ui_update(NULL);
+}
+
+/*
  * Create a new a probe target, apply resolver if needed.
  */
 static int
 target_add(const char *line)
 {
 	struct target *t;
-	struct timeval tv;
 
 	t = probe_add(line);
 	if (t == NULL)
 		return -1;
 	if (!t->resolved) {
-		t->ev_resolve = event_new(ev_base, -1, 0, target_resolve, t);
-		evutil_timerclear(&tv);
-		event_add(t->ev_resolve, &tv);
+		t->dnstask = dnstask_new(t->host, dnstask_helper, t);
 	}
 	numtargets++;
 	return 0;
