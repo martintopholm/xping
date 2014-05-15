@@ -174,25 +174,21 @@ updatefull(int ifirst, int ilast)
 	row = 0;
 	DL_FOREACH(list, t) {
 		t->row = row; /* cache for selective updates */
-		if (C_flag && t->af && sa(t)->sa_family == AF_INET6)
+		if (C_flag && t->af == AF_INET6)
 			mvprintw(row, 0, "%c[2;32m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
-		else if (C_flag && t->af && sa(t)->sa_family == AF_INET)
+		else if (C_flag && t->af == AF_INET)
 			mvprintw(row, 0, "%c[2;31m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
 		else
 			mvprintw(row, 0, "%*.*s", w_width, w_width, t->host);
 		if (w_width)
 			addch(' ');
-		if (t->duplicate != NULL)
-			mvprintw(row, labelwidth, "(duplicate of %s)", t->duplicate->host);
-		else {
-			for (i=ifirst; i<ilast; i++) {
-				if (i < t->npkts)
-					addch(t->res[i % NUM]);
-				else
-					addch(' ');
-			}
+		for (i=ifirst; i<ilast; i++) {
+			if (i < t->npkts)
+				addch(t->res[i % NUM]);
+			else
+				addch(' ');
 		}
 		move(++row, 0);
 	}
@@ -215,11 +211,11 @@ termio_init(void)
 	x = getmaxx();
 	y = getmaxy();
 	if (x > 0 && y > 0) {
-		scrbuffer = malloc(x * y);
-		if (scrbuffer != NULL)
-			setvbuf(stdout, scrbuffer, _IOFBF, x * y);
-		else
-			perror("malloc");
+	scrbuffer = malloc(x * y);
+	if (scrbuffer != NULL)
+		setvbuf(stdout, scrbuffer, _IOFBF, x * y);
+	else
+		perror("malloc");
 	} else {
 		scrbuffer = NULL;
 	}
@@ -317,11 +313,11 @@ termio_cleanup(void)
 
 	endwin();
 	DL_FOREACH(list, t) {
-		if (C_flag && t->dnstask && sa(t)->sa_family == AF_INET6)
+		if (C_flag && t->af == AF_INET6)
 			fprintf(stdout, "%c[2;32m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
-		else if (C_flag && t->dnstask && sa(t)->sa_family == AF_INET)
-			fprintf(stdout, "%c[2;31m%*.*s%c[0m",
+		else if (C_flag && t->af == AF_INET)
+			fprintf(stdout, "%c[2;31m%*.*%sc[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
 		else
 			fprintf(stdout, "%*.*s", w_width, w_width, t->host);

@@ -14,15 +14,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include <event2/event.h>
 #include <event2/buffer.h>
-
 #include "xping.h"
+
+struct probe {
+	char		host[MAXHOST];
+	int		resolved;
+	union addr	sa;
+	int		pid;
+	int		fd;
+	int		seqdelta;
+	int		seqlast;
+	struct evbuffer	*evbuf;
+	void		*owner;
+};
 
 static regex_t re_reply, re_other, re_xmiterr;
 
 static void
-killping(struct target *t)
+killping(struct probe *t)
 {
 	if (t->pid && kill(t->pid, 0) == 0) {
 		kill(t->pid, SIGTERM);
@@ -31,7 +43,7 @@ killping(struct target *t)
 }
 
 static void
-execping(struct target *t)
+execping(struct probe *t)
 {
 	char address[64];
 	char interval[24];
@@ -51,7 +63,7 @@ execping(struct target *t)
 static void
 readping(int fd, short what, void *thunk)
 {
-	struct target *t = thunk;
+	struct probe *t = thunk;
 	regmatch_t match[5];
 	struct evbuffer_ptr evbufptr;
 	double rtt;
@@ -82,14 +94,14 @@ readping(int fd, short what, void *thunk)
 		} else if (regexec(&re_xmiterr, buf, 5, match, 0) == 0) {
 			/* Transmit errors are quickly identified,
 			 * thus assume they refer to most recent packet */
-			target_mark(t, t->seqlast, '!');
+			target_mark(t->owner, t->seqlast, '!');
 		}
 		if (mark != '\0') {
 			/* Adjust sequence adjustment delta. In cast the
 			 * first packet has icmp_seq=0 instead of 1 */
 			if (t->seqlast < 32768 && seq == 0)
 				t->seqdelta++;
-			target_mark(t, seq + t->seqdelta, mark);
+			target_mark(t->owner, seq + t->seqdelta, mark);
 
 			/* Check for timing drift: If packet isn't the
 			 * latest reply and ping thinks rtt is less than
@@ -98,7 +110,7 @@ readping(int fd, short what, void *thunk)
 			    seq + t->seqdelta < t->seqlast &&
 			    rtt < i_interval) {
 				killping(t);
-				target_mark(t, t->seqlast, '!');
+				target_mark(t->owner, t->seqlast, '!');
 			}
 		}
 		evbufptr = evbuffer_search_eol(t->evbuf, NULL, &len, EVBUFFER_EOL_LF);
@@ -113,7 +125,7 @@ readping(int fd, short what, void *thunk)
 static void
 resolved(int af, void *address, void *thunk)
 {
-	struct target *t = thunk;
+	struct probe *t = thunk;
 	if (af == AF_INET6) {
 		if (sin6(t)->sin6_family == AF_INET6 &&
 		    memcmp(&sin6(t)->sin6_addr, (struct in6_addr *)address,
@@ -138,7 +150,7 @@ resolved(int af, void *address, void *thunk)
 		t->resolved = 0;
 		killping(t);
 	}
-	target_resolved(t, af, address);
+	target_resolved(t->owner, af, address);
 }
 
 /*
@@ -181,27 +193,25 @@ probe_setup(struct event_base *parent_event_base)
 	}
 }
 
-struct target *
-probe_add(const char *line)
+struct probe *
+probe_new(const char *line, void *owner)
 {
-	struct target *t;
+	struct probe *t;
 	union addr sa;
 	int salen;
 
-	t = malloc(sizeof(*t));
+	t = calloc(1, sizeof(*t));
 	if (t == NULL) {
 		perror("malloc");
 		return (NULL);
 	}
-	memset(t, 0, sizeof(*t));
-	memset(t->res, ' ', sizeof(t->res));
+	t->owner = owner;
 	strncat(t->host, line, sizeof(t->host) - 1);
 	t->evbuf = evbuffer_new();
 	if (t->evbuf == NULL) {
 		free(t);
 		return (NULL);
 	}
-	DL_APPEND(list, t);
 
 	salen = sizeof(sa);
 	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
@@ -224,11 +234,16 @@ probe_add(const char *line)
 }
 
 void
-probe_send(struct target *t, int seq)
+probe_send(struct probe *t, int seq)
 {
 	struct event *ev;
 	int pair[2];
 	pid_t pid;
+
+	if (!t->resolved) {
+		target_mark(t->owner, seq, '@');
+		return;
+	}
 
 	/* Save most recent sequence number to close gap between
 	 * probe_send returning (target_probe increasing npkts) and forked
@@ -237,7 +252,7 @@ probe_send(struct target *t, int seq)
 
 	/* Clear ahead to avoid overwriting a result in case of small
 	 * timing indiscrepancies */
-	target_unmark(t, seq+1);
+	target_unmark(t->owner, seq+1);
 
 	/* Check for existing ping process */
 	if (t->pid && kill(t->pid, 0) == 0)
@@ -245,7 +260,7 @@ probe_send(struct target *t, int seq)
 
 	/* Create ipc socket pair and fork ping process */
 	if (evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, pair) < 0) {
-		target_mark(t, seq, '!'); /* transmit error */
+		target_mark(t->owner, seq, '!'); /* transmit error */
 		return;
 	}
 	t->seqdelta = seq - 1; /* linux ping(8) begins icmp_seq=1 */
@@ -254,7 +269,7 @@ probe_send(struct target *t, int seq)
 	event_add(ev, NULL);
 	switch (pid = fork()) {
 	case -1:
-		target_mark(t, seq, '!'); /* transmit error */
+		target_mark(t->owner, seq, '!'); /* transmit error */
 		return;
 	case 0:
 		evutil_closesocket(pair[0]);

@@ -19,21 +19,26 @@
 #include <event2/util.h>
 #include "xping.h"
 
-static regex_t re_target;
-static struct timeval tv_timeout;
-static void session_eventcb(struct bufferevent *, short, void *);
-static void session_readcb_drain(struct bufferevent *, void *);
+struct probe {
+	char		host[MAXHOST];
+	int		resolved;
+	union addr	sa;
+	char		query[64];
+	void		*owner;
+};
 
-/* state for active tcp connection with a server */
 struct session {
-	struct target	*t;
+	struct probe	*t;
 	int		seq;
 	struct bufferevent *bev;
-
 	struct event	*ev_timeout;
 	int		completed;
 };
 
+static regex_t re_target;
+static struct timeval tv_timeout;
+static void session_eventcb(struct bufferevent *, short, void *);
+static void session_readcb_drain(struct bufferevent *, void *);
 
 /*
  * Drop a session and free the associated state. bufferevent_free is
@@ -106,7 +111,7 @@ session_readcb_status(struct bufferevent *bev, void *thunk)
 	if (atoi(number) < 400 && atoi(number) >= 200 ) {
 		session->completed = 1;
 	} else {
-		target_mark(session->t, session->seq, '%');
+		target_mark(session->t->owner, session->seq, '%');
 	}
 	/* Drain the response on future callbacks */
 	bufferevent_setcb(session->bev, session_readcb_drain, NULL,
@@ -142,16 +147,16 @@ session_eventcb(struct bufferevent *bev, short what, void *thunk)
 	case BEV_EVENT_EOF:
 		bufferevent_disable(bev, EV_READ|EV_WRITE);
 		if (session->completed)
-			target_mark(session->t, session->seq, '.');
+			target_mark(session->t->owner, session->seq, '.');
 		else
-			target_mark(session->t, session->seq, '%');
+			target_mark(session->t->owner, session->seq, '%');
 		break;
 	case BEV_EVENT_ERROR:
 		bufferevent_disable(bev, EV_READ|EV_WRITE);
-		target_mark(session->t, session->seq, '#');
+		target_mark(session->t->owner, session->seq, '#');
 		break;
 	case BEV_EVENT_TIMEOUT:
-		target_mark(session->t, session->seq, '?');
+		target_mark(session->t->owner, session->seq, '?');
 		break;
 	}
 	session_free(session);
@@ -175,7 +180,7 @@ session_timeout(int fd, short what, void *thunk)
 static void
 resolved(int af, void *address, void *thunk)
 {
-	struct target *t = thunk;
+	struct probe *t = thunk;
 	if (af == AF_INET6) {
 		sin6(t)->sin6_family = AF_INET6;
 		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)address,
@@ -189,7 +194,7 @@ resolved(int af, void *address, void *thunk)
 	} else if (af == 0) {
 		t->resolved = 0;
 	}
-	target_resolved(t, af, address);
+	target_resolved(t->owner, af, address);
 }
 
 /*
@@ -262,10 +267,10 @@ static const char uri_chars[256] = {
  * Allocate structure for a new target and parse source line into the
  * structure. Report errors on stderr.
  */
-struct target *
-probe_add(const char *line)
+struct probe *
+probe_new(const char *line, void *owner)
 {
-	struct target *t;
+	struct probe *t;
 	union addr sa;
 	int salen;
 	int port;
@@ -284,7 +289,7 @@ probe_add(const char *line)
 		perror("probe_add: calloc");
 		return (t);
 	}
-	memset(t->res, ' ', sizeof(t->res));
+	t->owner = owner;
 
 	strncat(t->host, line + match[RE_HOST].rm_so,
 	    MIN(sizeof(t->host) - 1,
@@ -358,23 +363,26 @@ probe_add(const char *line)
 		}
 	}
 	sin(t)->sin_port = htons(port);
-	DL_APPEND(list, t);
 	return (t);
 }
 
 /*
  * Allocate session state for a single target probe and launch the probe.
  */
-void probe_send(struct target *t, int seq)
+void probe_send(struct probe *t, int seq)
 {
 	struct session *session;
 	char buf[512];
 	int salen;
 
-	target_unmark(t, seq);
+	target_unmark(t->owner, seq);
+	if (!t->resolved) {
+		target_mark(t->owner, seq, '@');
+		return;
+	}
 	session = calloc(1, sizeof(*session));
 	if (session == NULL) {
-		target_mark(t, seq, '!');
+		target_mark(t->owner, seq, '!');
 		return;
 	}
 	session->t = t;
@@ -382,7 +390,7 @@ void probe_send(struct target *t, int seq)
 	session->bev = bufferevent_socket_new(ev_base, -1,
 	    BEV_OPT_CLOSE_ON_FREE);
 	if (session->bev == NULL) {
-		target_mark(t, seq, '!');
+		target_mark(t->owner, seq, '!');
 		free(session);
 		return;
 	}
@@ -393,7 +401,7 @@ void probe_send(struct target *t, int seq)
 	salen = sa(t)->sa_family == AF_INET6 ? sizeof(struct sockaddr_in6) :
 	    sizeof(struct sockaddr_in);
 	if (bufferevent_socket_connect(session->bev, sa(t), salen) < 0) {
-		target_mark(t, seq, '!');
+		target_mark(t->owner, seq, '!');
 		return;
 	}
 	bufferevent_setwatermark(session->bev, EV_READ, 0, 4096);
@@ -401,7 +409,7 @@ void probe_send(struct target *t, int seq)
 	session->ev_timeout = event_new(ev_base, -1, 0, session_timeout,
 	    session);
 	if (session->ev_timeout == NULL) {
-		target_mark(t, seq, '!');
+		target_mark(t->owner, seq, '!');
 		session_free(session);
 		return;
 	}

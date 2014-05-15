@@ -11,6 +11,7 @@
 #include "utlist.h"
 
 #define NUM 300
+#define MAXHOST 64
 
 extern struct event_base *ev_base;
 extern struct target *list;
@@ -28,31 +29,15 @@ union addr {
 
 struct target {
 	char		host[64];
-	int		resolved;
-
-	union addr	sa;
 	int		npkts;
 	char		res[NUM+1];
 
-	struct dnstask	*dnstask;
+	struct probe	*pcb;
 	struct event	*ev_write;
-	struct target	*duplicate;
 
 	int		row;
 	int		af;
 
-	/* icmp-unpriv. */
-	int		pid;
-	int		fd;
-	int		seqdelta;
-	int		seqlast;
-	struct evbuffer	*evbuf;
-
-	/* http */
-	unsigned short	port;
-	char		query[64];
-
-	UT_hash_handle	hh;
 	struct target	*prev, *next;
 };
 
@@ -80,8 +65,8 @@ void report_cleanup(void);
 
 /* from icmp.c */
 void probe_setup();
-struct target *probe_add(const char *);
-void probe_send(struct target *, int);
+struct probe *probe_new(const char *, void *);
+void probe_send(struct probe *, int);
 
 /* from dnstask.c */
 typedef void (*dnstask_cb_type)(int, void *, void *);
