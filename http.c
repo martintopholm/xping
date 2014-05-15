@@ -28,7 +28,7 @@ struct probe {
 };
 
 struct session {
-	struct probe	*t;
+	struct probe	*prb;
 	int		seq;
 	struct bufferevent *bev;
 	struct event	*ev_timeout;
@@ -68,7 +68,7 @@ session_send(struct session *session)
 	    "Host: %s\r\n"
 	    "Connection: close\r\n"
 	    "User-Agent: xping/%s\r\n"
-	    "\r\n", session->t->query, session->t->host, version);
+	    "\r\n", session->prb->query, session->prb->host, version);
 }
 
 /*
@@ -111,7 +111,7 @@ session_readcb_status(struct bufferevent *bev, void *thunk)
 	if (atoi(number) < 400 && atoi(number) >= 200 ) {
 		session->completed = 1;
 	} else {
-		target_mark(session->t->owner, session->seq, '%');
+		target_mark(session->prb->owner, session->seq, '%');
 	}
 	/* Drain the response on future callbacks */
 	bufferevent_setcb(session->bev, session_readcb_drain, NULL,
@@ -147,16 +147,16 @@ session_eventcb(struct bufferevent *bev, short what, void *thunk)
 	case BEV_EVENT_EOF:
 		bufferevent_disable(bev, EV_READ|EV_WRITE);
 		if (session->completed)
-			target_mark(session->t->owner, session->seq, '.');
+			target_mark(session->prb->owner, session->seq, '.');
 		else
-			target_mark(session->t->owner, session->seq, '%');
+			target_mark(session->prb->owner, session->seq, '%');
 		break;
 	case BEV_EVENT_ERROR:
 		bufferevent_disable(bev, EV_READ|EV_WRITE);
-		target_mark(session->t->owner, session->seq, '#');
+		target_mark(session->prb->owner, session->seq, '#');
 		break;
 	case BEV_EVENT_TIMEOUT:
-		target_mark(session->t->owner, session->seq, '?');
+		target_mark(session->prb->owner, session->seq, '?');
 		break;
 	}
 	session_free(session);
@@ -180,21 +180,21 @@ session_timeout(int fd, short what, void *thunk)
 static void
 resolved(int af, void *address, void *thunk)
 {
-	struct probe *t = thunk;
+	struct probe *prb = thunk;
 	if (af == AF_INET6) {
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)address,
-		    sizeof(sin6(t)->sin6_addr));
-		t->resolved = 1;
+		sin6(prb)->sin6_family = AF_INET6;
+		memmove(&sin6(prb)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(prb)->sin6_addr));
+		prb->resolved = 1;
 	} else if (af == AF_INET) {
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)address,
-		    sizeof(sin(t)->sin_addr));
-		t->resolved = 1;
+		sin(prb)->sin_family = AF_INET;
+		memmove(&sin(prb)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(prb)->sin_addr));
+		prb->resolved = 1;
 	} else if (af == 0) {
-		t->resolved = 0;
+		prb->resolved = 0;
 	}
-	target_resolved(t->owner, af, address);
+	target_resolved(prb->owner, af, address);
 }
 
 /*
@@ -218,10 +218,11 @@ probe_setup()
 {
 	tv_timeout.tv_sec = 3 * i_interval / 1000;
 	tv_timeout.tv_usec = 3 * i_interval % 1000 * 1000;
-	if (regcomp(&re_target,
-	    "^(http:(//)?)?([0-9A-Za-z.-]+)(\\[([0-9A-Fa-f.:]+)\\])?(:[0-9]+)?(/[^ ]*)?$",
+	if (regcomp(&re_target, "^(http:(//)?)?"
+            "([0-9A-Za-z.-]+)(\\[([0-9A-Fa-f.:]+)\\])?(:[0-9]+)?(/[^ ]*)?$",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
-		fprintf(stderr, "regcomp: error compiling regular expression\n");
+		fprintf(stderr,
+		    "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
 }
@@ -270,7 +271,7 @@ static const char uri_chars[256] = {
 struct probe *
 probe_new(const char *line, void *owner)
 {
-	struct probe *t;
+	struct probe *prb;
 	union addr sa;
 	int salen;
 	int port;
@@ -284,37 +285,37 @@ probe_new(const char *line, void *owner)
 		return NULL;
 	}
 
-	t = calloc(1, sizeof(*t));
-	if (t == NULL) {
+	prb = calloc(1, sizeof(*prb));
+	if (prb == NULL) {
 		perror("probe_add: calloc");
-		return (t);
+		return (prb);
 	}
-	t->owner = owner;
+	prb->owner = owner;
 
-	strncat(t->host, line + match[RE_HOST].rm_so,
-	    MIN(sizeof(t->host) - 1,
+	strncat(prb->host, line + match[RE_HOST].rm_so,
+	    MIN(sizeof(prb->host) - 1,
 	    match[RE_HOST].rm_eo - match[RE_HOST].rm_so));
 	if (match[RE_PORT].rm_so  != -1)
 		port = strtol(line + match[RE_PORT].rm_so + 1, &end, 10);
 	else
 		port = 80;
 
-	/* t->query NULL termination is provided by calloc */
+	/* prb->query NULL termination is provided by calloc */
 	if (match[RE_URL].rm_so != -1)
 		for (i = match[RE_URL].rm_so, j = 0; i < match[RE_URL].rm_eo &&
-		    j + 3 < sizeof(t->query) - 1; i++) {
+		    j + 3 < sizeof(prb->query) - 1; i++) {
 			const char *src = &line[i];
 			if (uri_chars[(unsigned char)*src])
-				t->query[j++] = *src;
+				prb->query[j++] = *src;
 			else if (*src == ' ')
-				t->query[j++] = '+';
+				prb->query[j++] = '+';
 			else
-				t->query[j++] = '%',
-				    t->query[j++] = to_hex(*src >> 4),
-				    t->query[j++] = to_hex(*src & 0xf);
+				prb->query[j++] = '%',
+				    prb->query[j++] = to_hex(*src >> 4),
+				    prb->query[j++] = to_hex(*src & 0xf);
 		}
 	else
-		t->query[0] = '/';
+		prb->query[0] = '/';
 
 	/*
 	 * Check for presence of forced address e.g. example.com[127.0.0.1].
@@ -329,15 +330,16 @@ probe_new(const char *line, void *owner)
 		    MIN(sizeof(forced) - 1,
 		    match[RE_FORCED].rm_eo - match[RE_FORCED].rm_so));
 		if (evutil_parse_sockaddr_port(forced, &sa.sa, &salen) == 0) {
-			sa(t)->sa_family = sa.sa.sa_family;
+			sa(prb)->sa_family = sa.sa.sa_family;
 			if (sa.sa.sa_family == AF_INET6) {
-				memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
-				    sizeof(sin6(t)->sin6_addr));
+				memcpy(&sin6(prb)->sin6_addr,
+				    &sa.sin6.sin6_addr,
+				    sizeof(sin6(prb)->sin6_addr));
 			} else {
-				memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
-				    sizeof(sin(t)->sin_addr));
+				memcpy(&sin(prb)->sin_addr, &sa.sin.sin_addr,
+				    sizeof(sin(prb)->sin_addr));
 			}
-			t->resolved = 1;
+			prb->resolved = 1;
 		} else {
 			fprintf(stderr, "probe_add: can't parse %.128s\n",
 			    line);
@@ -345,63 +347,65 @@ probe_new(const char *line, void *owner)
 		}
 	} else {
 		salen = sizeof(sa);
-		if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
-			sa(t)->sa_family = sa.sa.sa_family;
+		if (evutil_parse_sockaddr_port(prb->host, &sa.sa,
+		    &salen) == 0) {
+			sa(prb)->sa_family = sa.sa.sa_family;
 			if (sa.sa.sa_family == AF_INET6) {
-				memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
-				    sizeof(sin6(t)->sin6_addr));
+				memcpy(&sin6(prb)->sin6_addr,
+				    &sa.sin6.sin6_addr,
+				    sizeof(sin6(prb)->sin6_addr));
 			} else {
-				memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
-				    sizeof(sin(t)->sin_addr));
+				memcpy(&sin(prb)->sin_addr, &sa.sin.sin_addr,
+				    sizeof(sin(prb)->sin_addr));
 			}
-			t->resolved = 1;
+			prb->resolved = 1;
 		} else {
-			if (dnstask_new(t->host, resolved, t) == NULL) {
-				free(t);
+			if (dnstask_new(prb->host, resolved, prb) == NULL) {
+				free(prb);
 				return NULL;
 			}
 		}
 	}
-	sin(t)->sin_port = htons(port);
-	return (t);
+	sin(prb)->sin_port = htons(port);
+	return (prb);
 }
 
 /*
  * Allocate session state for a single target probe and launch the probe.
  */
-void probe_send(struct probe *t, int seq)
+void probe_send(struct probe *prb, int seq)
 {
 	struct session *session;
 	char buf[512];
 	int salen;
 
-	target_unmark(t->owner, seq);
-	if (!t->resolved) {
-		target_mark(t->owner, seq, '@');
+	target_unmark(prb->owner, seq);
+	if (!prb->resolved) {
+		target_mark(prb->owner, seq, '@');
 		return;
 	}
 	session = calloc(1, sizeof(*session));
 	if (session == NULL) {
-		target_mark(t->owner, seq, '!');
+		target_mark(prb->owner, seq, '!');
 		return;
 	}
-	session->t = t;
+	session->prb = prb;
 	session->seq = seq;
 	session->bev = bufferevent_socket_new(ev_base, -1,
 	    BEV_OPT_CLOSE_ON_FREE);
 	if (session->bev == NULL) {
-		target_mark(t->owner, seq, '!');
+		target_mark(prb->owner, seq, '!');
 		free(session);
 		return;
 	}
 	bufferevent_setcb(session->bev, session_readcb_status, NULL,
 	    session_eventcb, session);
-	evutil_inet_ntop(AF_INET, &sin(t)->sin_addr, buf, sizeof(buf));
+	evutil_inet_ntop(AF_INET, &sin(prb)->sin_addr, buf, sizeof(buf));
 	bufferevent_enable(session->bev, EV_READ);
-	salen = sa(t)->sa_family == AF_INET6 ? sizeof(struct sockaddr_in6) :
+	salen = sa(prb)->sa_family == AF_INET6 ? sizeof(struct sockaddr_in6) :
 	    sizeof(struct sockaddr_in);
-	if (bufferevent_socket_connect(session->bev, sa(t), salen) < 0) {
-		target_mark(t->owner, seq, '!');
+	if (bufferevent_socket_connect(session->bev, sa(prb), salen) < 0) {
+		target_mark(prb->owner, seq, '!');
 		return;
 	}
 	bufferevent_setwatermark(session->bev, EV_READ, 0, 4096);
@@ -409,7 +413,7 @@ void probe_send(struct probe *t, int seq)
 	session->ev_timeout = event_new(ev_base, -1, 0, session_timeout,
 	    session);
 	if (session->ev_timeout == NULL) {
-		target_mark(t->owner, seq, '!');
+		target_mark(prb->owner, seq, '!');
 		session_free(session);
 		return;
 	}

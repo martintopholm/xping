@@ -90,37 +90,37 @@ in_cksum(u_short *addr, int len)
  * key already exists.
  */
 void
-activate(struct probe *t)
+activate(struct probe *prb)
 {
 	struct probe *result;
 
-	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), result);
-	if (result == t)
+	HASH_FIND(hh, hash, &prb->sa, sizeof(union addr), result);
+	if (result == prb)
 		; /* nothing, already active in hash */
 	else if (result)
-		t->duplicate = result;
+		prb->duplicate = result;
 	else
-		HASH_ADD(hh, hash, sa, sizeof(union addr), t);
+		HASH_ADD(hh, hash, sa, sizeof(union addr), prb);
 }
 
 /*
- * Remove a target (t) from the hash table if the target is the currently
- * active for the address. Secondly first target (t1) which was duplicate
- * of target (t) is activated, and other duplicates will refer of that
- * one (t) instead.
+ * Remove a probe (prb) from the hash table if the probe is the currently
+ * active for the address. Secondly first probe (t1) which was duplicate
+ * of probe (prb) is activated, and other duplicates will refer of that
+ * one (prb) instead.
  */
 void
-deactivate(struct probe *t)
+deactivate(struct probe *prb)
 {
 	struct probe *tmp, *tmp2, *t1;
 
-	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), tmp);
+	HASH_FIND(hh, hash, &prb->sa, sizeof(union addr), tmp);
 	if (tmp == NULL)
 		return; /* already inactive, i.e. not in hash */
-	HASH_DELETE(hh, hash, t);
+	HASH_DELETE(hh, hash, prb);
 	t1 = NULL;
 	HASH_ITER(hh, hash, tmp, tmp2) {
-		if (tmp->duplicate == t) {
+		if (tmp->duplicate == prb) {
 			if (t1 == NULL) {
 				t1 = tmp;
 				t1->duplicate = NULL;
@@ -206,16 +206,16 @@ write_packet6(struct sockaddr *sa, unsigned short seq)
 static void
 find_marktarget(int af, void *address, int seq, int ch)
 {
-	struct probe *t;
+	struct probe *prb;
 	int npkts;
 
-	t = find(af, address);
-	if (t == NULL)
+	prb = find(af, address);
+	if (prb == NULL)
 		return; /* unknown source address */
-	npkts = t->last_seq;
+	npkts = prb->last_seq;
 	if ((npkts & 0xffff) < seq)
 	    npkts -= 1<<16;
-	target_mark(t->owner, (npkts & ~0xffff) | seq, ch);
+	target_mark(prb->owner, (npkts & ~0xffff) | seq, ch);
 }
 
 /*
@@ -349,24 +349,24 @@ read_packet6(int fd, short what, void *thunk)
 static void
 resolved(int af, void *address, void *thunk)
 {
-	struct probe *t = thunk;
+	struct probe *prb = thunk;
 	if (af == AF_INET6) {
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)address,
-		    sizeof(sin6(t)->sin6_addr));
-		activate(t);
-		t->resolved = 1;
+		sin6(prb)->sin6_family = AF_INET6;
+		memmove(&sin6(prb)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(prb)->sin6_addr));
+		activate(prb);
+		prb->resolved = 1;
 	} else if (af == AF_INET) {
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)address,
-		    sizeof(sin(t)->sin_addr));
-		activate(t);
-		t->resolved = 1;
+		sin(prb)->sin_family = AF_INET;
+		memmove(&sin(prb)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(prb)->sin_addr));
+		activate(prb);
+		prb->resolved = 1;
 	} else if (af == 0) {
-		t->resolved = 0;
-		deactivate(t);
+		prb->resolved = 0;
+		deactivate(prb);
 	}
-	target_resolved(t->owner, af, address);
+	target_resolved(prb->owner, af, address);
 }
 
 /*
@@ -412,70 +412,70 @@ struct probe *
 probe_new(const char *line, void *owner)
 {
 	union addr sa;
-	struct probe *t;
+	struct probe *prb;
 	int salen;
 
-	t = calloc(1, sizeof(*t));
-	if (t == NULL) {
+	prb = calloc(1, sizeof(*prb));
+	if (prb == NULL) {
 		perror("malloc");
-		return (t);
+		return (prb);
 	}
-	t->owner = owner;
-	strncat(t->host, line, sizeof(t->host) - 1);
+	prb->owner = owner;
+	strncat(prb->host, line, sizeof(prb->host) - 1);
 
 	salen = sizeof(sa);
-	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
-		sa(t)->sa_family = sa.sa.sa_family;
+	if (evutil_parse_sockaddr_port(prb->host, &sa.sa, &salen) == 0) {
+		sa(prb)->sa_family = sa.sa.sa_family;
 		if (sa.sa.sa_family == AF_INET6) {
-			memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
-			    sizeof(sin6(t)->sin6_addr));
+			memcpy(&sin6(prb)->sin6_addr, &sa.sin6.sin6_addr,
+			    sizeof(sin6(prb)->sin6_addr));
 		} else {
-			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
-			    sizeof(sin(t)->sin_addr));
+			memcpy(&sin(prb)->sin_addr, &sa.sin.sin_addr,
+			    sizeof(sin(prb)->sin_addr));
 		}
-		t->resolved = 1;
-		activate(t);
+		prb->resolved = 1;
+		activate(prb);
 	} else {
-		if (dnstask_new(t->host, resolved, t) == NULL) {
-			free(t);
+		if (dnstask_new(prb->host, resolved, prb) == NULL) {
+			free(prb);
 			return NULL;
 		}
 	}
-	return (t);
+	return (prb);
 }
 
 /*
  * Send out a single probe for a target.
  */
 void
-probe_send(struct probe *t, int seq)
+probe_send(struct probe *prb, int seq)
 {
 	int len;
 	int n;
 
-	t->last_seq = seq;
-	if (!t->resolved) {
-		target_mark(t->owner, seq, '@');
+	prb->last_seq = seq;
+	if (!prb->resolved) {
+		target_mark(prb->owner, seq, '@');
 		return;
 	}
 
-	if (t->duplicate) {
-		target_mark(t->owner, seq, '"'); /* transmit error */
+	if (prb->duplicate) {
+		target_mark(prb->owner, seq, '"'); /* transmit error */
 		return;
 	}
 
-	if (sa(t)->sa_family == AF_INET6) {
-		n = write_packet6(sa(t), seq & 0xffff);
+	if (sa(prb)->sa_family == AF_INET6) {
+		n = write_packet6(sa(prb), seq & 0xffff);
 		len = ICMP6_MINLEN + datalen;
 	} else {
-		n = write_packet4(sa(t), seq & 0xffff);
+		n = write_packet4(sa(prb), seq & 0xffff);
 		len = ICMP_MINLEN + datalen;
 	}
-	target_unmark(t->owner, seq);
+	target_unmark(prb->owner, seq);
 
 	if (n < 0) {
-		target_mark(t->owner, seq, '!'); /* transmit error */
+		target_mark(prb->owner, seq, '!'); /* transmit error */
 	} else if (n != len) {
-		target_mark(t->owner, seq, '$'); /* partial transmit */
+		target_mark(prb->owner, seq, '$'); /* partial transmit */
 	}
 }

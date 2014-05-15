@@ -34,27 +34,30 @@ struct probe {
 static regex_t re_reply, re_other, re_xmiterr;
 
 static void
-killping(struct probe *t)
+killping(struct probe *prb)
 {
-	if (t->pid && kill(t->pid, 0) == 0) {
-		kill(t->pid, SIGTERM);
-		t->pid = 0;
+	if (prb->pid && kill(prb->pid, 0) == 0) {
+		kill(prb->pid, SIGTERM);
+		prb->pid = 0;
 	}
 }
 
 static void
-execping(struct probe *t)
+execping(struct probe *prb)
 {
 	char address[64];
 	char interval[24];
 
-	evutil_snprintf(interval, sizeof(interval), "%f", (double)i_interval/1000);
+	evutil_snprintf(interval, sizeof(interval), "%f",
+	    (double)i_interval/1000);
 
-	if (sa(t)->sa_family == AF_INET6) {
-		evutil_inet_ntop(sa(t)->sa_family, &sin6(t)->sin6_addr, address, sizeof(address));
+	if (sa(prb)->sa_family == AF_INET6) {
+		evutil_inet_ntop(sa(prb)->sa_family, &sin6(prb)->sin6_addr,
+		    address, sizeof(address));
 		execlp("ping6", "ping6", "-ni", interval, address, NULL);
 	} else {
-		evutil_inet_ntop(sa(t)->sa_family, &sin(t)->sin_addr, address, sizeof(address));
+		evutil_inet_ntop(sa(prb)->sa_family, &sin(prb)->sin_addr,
+		    address, sizeof(address));
 		execlp("ping", "ping", "-ni", interval, address, NULL);
 	}
 	exit(1); /* in case exec fails */
@@ -63,7 +66,7 @@ execping(struct probe *t)
 static void
 readping(int fd, short what, void *thunk)
 {
-	struct probe *t = thunk;
+	struct probe *prb = thunk;
 	regmatch_t match[5];
 	struct evbuffer_ptr evbufptr;
 	double rtt;
@@ -74,11 +77,12 @@ readping(int fd, short what, void *thunk)
 	int mark;
 	int n;
 
-	evbuffer_read(t->evbuf, fd, 512);
-	evbufptr = evbuffer_search_eol(t->evbuf, NULL, &len, EVBUFFER_EOL_ANY);
+	evbuffer_read(prb->evbuf, fd, 512);
+	evbufptr = evbuffer_search_eol(prb->evbuf, NULL, &len,
+	    EVBUFFER_EOL_ANY);
 	while (evbufptr.pos != -1) {
 		len += evbufptr.pos;
-		n = evbuffer_remove(t->evbuf, buf, MIN(sizeof(buf)-1, len));
+		n = evbuffer_remove(prb->evbuf, buf, MIN(sizeof(buf)-1, len));
 		buf[n] = '\0';
 		mark = '\0';
 		if (regexec(&re_reply, buf, 5, match, 0) == 0) {
@@ -94,26 +98,27 @@ readping(int fd, short what, void *thunk)
 		} else if (regexec(&re_xmiterr, buf, 5, match, 0) == 0) {
 			/* Transmit errors are quickly identified,
 			 * thus assume they refer to most recent packet */
-			target_mark(t->owner, t->seqlast, '!');
+			target_mark(prb->owner, prb->seqlast, '!');
 		}
 		if (mark != '\0') {
 			/* Adjust sequence adjustment delta. In cast the
 			 * first packet has icmp_seq=0 instead of 1 */
-			if (t->seqlast < 32768 && seq == 0)
-				t->seqdelta++;
-			target_mark(t->owner, seq + t->seqdelta, mark);
+			if (prb->seqlast < 32768 && seq == 0)
+				prb->seqdelta++;
+			target_mark(prb->owner, seq + prb->seqdelta, mark);
 
 			/* Check for timing drift: If packet isn't the
 			 * latest reply and ping thinks rtt is less than
 			 * i_interval it must have drifted */
 			if (mark == '.' &&
-			    seq + t->seqdelta < t->seqlast &&
+			    seq + prb->seqdelta < prb->seqlast &&
 			    rtt < i_interval) {
-				killping(t);
-				target_mark(t->owner, t->seqlast, '!');
+				killping(prb);
+				target_mark(prb->owner, prb->seqlast, '!');
 			}
 		}
-		evbufptr = evbuffer_search_eol(t->evbuf, NULL, &len, EVBUFFER_EOL_LF);
+		evbufptr = evbuffer_search_eol(prb->evbuf, NULL, &len,
+		    EVBUFFER_EOL_LF);
 	}
 }
 
@@ -125,32 +130,32 @@ readping(int fd, short what, void *thunk)
 static void
 resolved(int af, void *address, void *thunk)
 {
-	struct probe *t = thunk;
+	struct probe *prb = thunk;
 	if (af == AF_INET6) {
-		if (sin6(t)->sin6_family == AF_INET6 &&
-		    memcmp(&sin6(t)->sin6_addr, (struct in6_addr *)address,
-		    sizeof(sin6(t)->sin6_addr)) == 0)
+		if (sin6(prb)->sin6_family == AF_INET6 &&
+		    memcmp(&sin6(prb)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(prb)->sin6_addr)) == 0)
 			return;
-		sin6(t)->sin6_family = AF_INET6;
-		memmove(&sin6(t)->sin6_addr, (struct in6_addr *)address,
-		    sizeof(sin6(t)->sin6_addr));
-		killping(t);
-		t->resolved = 1;
+		sin6(prb)->sin6_family = AF_INET6;
+		memmove(&sin6(prb)->sin6_addr, (struct in6_addr *)address,
+		    sizeof(sin6(prb)->sin6_addr));
+		killping(prb);
+		prb->resolved = 1;
 	} else if (af == AF_INET) {
-		if (sin(t)->sin_family == AF_INET &&
-		    memcmp(&sin(t)->sin_addr, (struct in_addr *)address,
-		    sizeof(sin(t)->sin_addr)) == 0)
+		if (sin(prb)->sin_family == AF_INET &&
+		    memcmp(&sin(prb)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(prb)->sin_addr)) == 0)
 			return;
-		sin(t)->sin_family = AF_INET;
-		memmove(&sin(t)->sin_addr, (struct in_addr *)address,
-		    sizeof(sin(t)->sin_addr));
-		killping(t);
-		t->resolved = 1;
+		sin(prb)->sin_family = AF_INET;
+		memmove(&sin(prb)->sin_addr, (struct in_addr *)address,
+		    sizeof(sin(prb)->sin_addr));
+		killping(prb);
+		prb->resolved = 1;
 	} else if (af == 0) {
-		t->resolved = 0;
-		killping(t);
+		prb->resolved = 0;
+		killping(prb);
 	}
-	target_resolved(t->owner, af, address);
+	target_resolved(prb->owner, af, address);
 }
 
 /*
@@ -176,19 +181,22 @@ probe_setup(struct event_base *parent_event_base)
 	if (regcomp(&re_reply,
 	    "[0-9]+ bytes.*icmp_.eq=([0-9][0-9]*) .*time=([0-9].[0-9]*)",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
-		fprintf(stderr, "regcomp: error compiling regular expression\n");
+		fprintf(stderr,
+		    "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
 	if (regcomp(&re_other, "From .*icmp_.eq=([0-9][0-9]*)"
 	    "( Destination Host Unreachable| Destination unreachable| )",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
-		fprintf(stderr, "regcomp: error compiling regular expression\n");
+		fprintf(stderr,
+		    "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
 	if (regcomp(&re_xmiterr, "(ping|ping6|connect): "
 	    "(sentto|UDP connect|sendmsg|Network is unreachable)",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
-		fprintf(stderr, "regcomp: error compiling regular expression\n");
+		fprintf(stderr,
+		    "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
 }
@@ -196,92 +204,92 @@ probe_setup(struct event_base *parent_event_base)
 struct probe *
 probe_new(const char *line, void *owner)
 {
-	struct probe *t;
+	struct probe *prb;
 	union addr sa;
 	int salen;
 
-	t = calloc(1, sizeof(*t));
-	if (t == NULL) {
+	prb = calloc(1, sizeof(*prb));
+	if (prb == NULL) {
 		perror("malloc");
 		return (NULL);
 	}
-	t->owner = owner;
-	strncat(t->host, line, sizeof(t->host) - 1);
-	t->evbuf = evbuffer_new();
-	if (t->evbuf == NULL) {
-		free(t);
+	prb->owner = owner;
+	strncat(prb->host, line, sizeof(prb->host) - 1);
+	prb->evbuf = evbuffer_new();
+	if (prb->evbuf == NULL) {
+		free(prb);
 		return (NULL);
 	}
 
 	salen = sizeof(sa);
-	if (evutil_parse_sockaddr_port(t->host, &sa.sa, &salen) == 0) {
-		sa(t)->sa_family = sa.sa.sa_family;
+	if (evutil_parse_sockaddr_port(prb->host, &sa.sa, &salen) == 0) {
+		sa(prb)->sa_family = sa.sa.sa_family;
 		if (sa.sa.sa_family == AF_INET6) {
-			memcpy(&sin6(t)->sin6_addr, &sa.sin6.sin6_addr,
-			    sizeof(sin6(t)->sin6_addr));
+			memcpy(&sin6(prb)->sin6_addr, &sa.sin6.sin6_addr,
+			    sizeof(sin6(prb)->sin6_addr));
 		} else {
-			memcpy(&sin(t)->sin_addr, &sa.sin.sin_addr,
-			    sizeof(sin(t)->sin_addr));
+			memcpy(&sin(prb)->sin_addr, &sa.sin.sin_addr,
+			    sizeof(sin(prb)->sin_addr));
 		}
-		t->resolved = 1;
+		prb->resolved = 1;
 	} else {
-		if (dnstask_new(t->host, resolved, t) == NULL) {
-			free(t);
+		if (dnstask_new(prb->host, resolved, prb) == NULL) {
+			free(prb);
 			return NULL;
 		}
 	}
-	return (t);
+	return (prb);
 }
 
 void
-probe_send(struct probe *t, int seq)
+probe_send(struct probe *prb, int seq)
 {
 	struct event *ev;
 	int pair[2];
 	pid_t pid;
 
-	if (!t->resolved) {
-		target_mark(t->owner, seq, '@');
+	if (!prb->resolved) {
+		target_mark(prb->owner, seq, '@');
 		return;
 	}
 
 	/* Save most recent sequence number to close gap between
 	 * probe_send returning (target_probe increasing npkts) and forked
 	 * program outputting */
-	t->seqlast = seq;
+	prb->seqlast = seq;
 
 	/* Clear ahead to avoid overwriting a result in case of small
 	 * timing indiscrepancies */
-	target_unmark(t->owner, seq+1);
+	target_unmark(prb->owner, seq+1);
 
 	/* Check for existing ping process */
-	if (t->pid && kill(t->pid, 0) == 0)
+	if (prb->pid && kill(prb->pid, 0) == 0)
 		return;
 
 	/* Create ipc socket pair and fork ping process */
 	if (evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, pair) < 0) {
-		target_mark(t->owner, seq, '!'); /* transmit error */
+		target_mark(prb->owner, seq, '!'); /* transmit error */
 		return;
 	}
-	t->seqdelta = seq - 1; /* linux ping(8) begins icmp_seq=1 */
+	prb->seqdelta = seq - 1; /* linux ping(8) begins icmp_seq=1 */
 	evutil_make_socket_nonblocking(pair[0]);
-	ev = event_new(ev_base, pair[0], EV_READ|EV_PERSIST, readping, t);
+	ev = event_new(ev_base, pair[0], EV_READ|EV_PERSIST, readping, prb);
 	event_add(ev, NULL);
 	switch (pid = fork()) {
 	case -1:
-		target_mark(t->owner, seq, '!'); /* transmit error */
+		target_mark(prb->owner, seq, '!'); /* transmit error */
 		return;
 	case 0:
 		evutil_closesocket(pair[0]);
 		dup2(pair[1], 1);
 		dup2(pair[1], 2);
-		execping(t);
+		execping(prb);
 		/* NEVER REACHED */
 		break;
 	default:
 		evutil_closesocket(pair[1]);
-		t->pid = pid;
-		t->fd = pair[0];
+		prb->pid = pid;
+		prb->fd = pair[0];
 		break;
 	}
 }

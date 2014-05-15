@@ -32,7 +32,7 @@ struct target {
 	int		npkts;
 	char		res[NUM+1];
 
-	struct probe	*pcb;
+	struct probe	*prb;
 	struct event	*ev_write;
 
 	int		row;

@@ -97,7 +97,7 @@ target_probe(int fd, short what, void *thunk)
 	}
 
 	/* Transmit request */
-	probe_send(t->pcb, t->npkts);
+	probe_send(t->prb, t->npkts);
 	t->npkts++;
 
 	ui_update(t);
@@ -176,8 +176,8 @@ target_add(const char *line)
 	memset(t->res, ' ', sizeof(t->res));
 	strncat(t->host, line, sizeof(t->host) - 1);
 	DL_APPEND(list, t);
-	t->pcb = probe_new(line, t);
-	if (t->pcb == NULL)
+	t->prb = probe_new(line, t);
+	if (t->prb == NULL)
 		return -1;
 	numtargets++;
 	return 0;
