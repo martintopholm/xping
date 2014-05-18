@@ -3,15 +3,23 @@ FLOW
 
 Below is a diagram outlining control flow within xping.c:
 
-    main()                 [xping.c]                      |       [icmp.c]
+    main()                 [xping.c]                      |       [dnstask.c]
       |                                                   |
-      |---------------------------------------------------|--> probe_setup --------.
-      |                                                   |                        |
-      |--> target_add ------------------------------------|--> probe_add ---------.|
-      |      |                                            |                       ||
-      |      '->> target_resolve                          |                       ||
-      |             |                                     |                       ||
-      |             '->> target_is_resolved --------------|--> probe_resolved     ||
+      |                                                   | .-> dnstask_new
+      |                                                   | |       v
+      |                                                   | |       v
+      |                                                   | |   sendquery ------.
+      |                                                   | |                   |
+      |                                                   +--------------------------
+      |                                                   | |                   |
+      |                                                   | |      [icmp.c]     |
+      |                                                   | |                   |
+      |---------------------------------------------------|-(-> probe_setup ----(--.
+      |                                                   | |                   |  |
+      |                                                   | '----.              |  |
+      |--> target_add ------------------------------------|--> probe_add -------(-.|
+      |                                                   |                     | ||
+      |                  target_resolved <----------------|--- resolved <<------' ||
       |                   |                               |      |--> activate <--'|
       |                   '-> ui_update                   |      '--> deactivate   |
       |                        ^    ^                     |                        |
