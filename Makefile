@@ -10,7 +10,7 @@ MANPATH=$(PREFIX)/man
 CFLAGS=-Wall -Werror -I/usr/local/include
 LDFLAGS=-L/usr/local/lib -L/usr/local/lib/event2
 DEPS=check-libevent
-OBJS=xping.o termio.o report.o version.o
+OBJS=termio.o report.o version.o
 LIBS=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.2`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
@@ -18,9 +18,7 @@ TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 # Static libevent linking (OSX doesn't use -lrt)
 #CFLAGS+=-I./$(LIBEVENT)/include
 #DEPS=libevent.a
-#OBJS+=libevent.a
-#LIBS=-lrt
-#LDFLAGS=-L./$(LIBEVENT)/.libs
+#LIBS=libevent.a -lrt
 
 # Dynamic link and use ncurses
 #DEPS+=check-curses
@@ -69,14 +67,17 @@ version.o:
 	 printf "const char built[] = \"%s\";\n" $(TIMESTAMP)) | \
 	 $(CC) -x c -c -o version.o -
 
-xping: $(DEPS) $(OBJS) icmp.o
-	$(CC) $(LDFLAGS) -o xping icmp.o $(OBJS) $(LIBS)
+xping-raw.o: xping.c
+	$(CC) $(CFLAGS) -DDO_SOCK_RAW -c -o xping-raw.o xping.c
 
-xping-unpriv: $(DEPS) $(OBJS) icmp-unpriv.o
-	$(CC) $(LDFLAGS) -o xping-unpriv icmp-unpriv.o $(OBJS) $(LIBS)
+xping: $(DEPS) $(OBJS) xping-raw.o icmp.o
+	$(CC) $(LDFLAGS) -o xping xping-raw.o icmp.o $(OBJS) $(LIBS)
 
-xping-http: $(DEPS) $(OBJS) http.o
-	$(CC) $(LDFLAGS) -o xping-http http.o $(OBJS) $(LIBS)
+xping-unpriv: $(DEPS) $(OBJS) xping.o icmp-unpriv.o
+	$(CC) $(LDFLAGS) -o xping-unpriv xping.o icmp-unpriv.o $(OBJS) $(LIBS)
+
+xping-http: $(DEPS) $(OBJS) xping.o http.o
+	$(CC) $(LDFLAGS) -o xping-http xping.o http.o $(OBJS) $(LIBS)
 
 xping.8.gz: xping.8
 	gzip -c xping.8 > xping.8.gz
@@ -90,7 +91,8 @@ install:
 clean:
 	rm -f check-libevent check-curses \
 	      xping xping.8.gz xping-http xping-unpriv \
-	      http.o icmp.o icmp-unpriv.o $(OBJS)
+	      xping.o xping-raw.o http.o icmp.o icmp-unpriv.o \
+	      $(OBJS)
 
 # Object dependencies (gcc -MM *.c)
 icmp.o: icmp.c xping.h uthash.h utlist.h

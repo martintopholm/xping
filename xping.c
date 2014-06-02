@@ -285,12 +285,19 @@ main(int argc, char *argv[])
 	int len;
 	char ch;
 
+#ifdef DO_SOCK_RAW
 	/* Open RAW-socket and drop root-privs */
 	fd4 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	fd4errno = errno;
 	fd6 = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	fd6errno = errno;
 	setuid(getuid());
+#else /* !DO_SOCK_RAW */
+	fd4 = -1;
+	fd4errno = EAFNOSUPPORT;
+	fd6 = -1;
+	fd6errno = EAFNOSUPPORT;
+#endif /* DO_SOCK_RAW */
 
 	/* Parse command line options */
 	while ((ch = getopt(argc, argv, "46ACTac:i:w:hV")) != -1) {
