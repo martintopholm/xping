@@ -204,7 +204,10 @@ target_probe_sched(int fd, short what, void *thunk)
 void
 target_mark(struct target *t, int seq, int ch)
 {
-	t->res[seq % NUM] = ch;
+	if (ch == '.' && t->res[seq % NUM] != ' ')
+		t->res[seq % NUM] = ':';
+	else
+		t->res[seq % NUM] = ch;
 	if (a_flag && ch == '.') {
 		if (a_flag == 1)
 			write(STDOUT_FILENO, "\a", 1);

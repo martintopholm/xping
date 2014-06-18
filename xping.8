@@ -60,6 +60,8 @@ is 1.0 seconds.
 .Bl -tag -width indent
 .It .
 Reply received
+.It :
+Reply received after timeout (recovered)
 .It ?
 Timeout - interval password with no reply.
 .It #
@@ -70,6 +72,8 @@ Other error e.g. TTL expired in transit.
 Resolving - waiting for dns lookup to complete.
 .It !
 sendto error e.g. permission denied or no route to destination.
+.It \(dq
+Duplicate of some other entry.
 .El
 .Sh DIAGNOSTICS
 .Bl -tag -width indent
