@@ -13,6 +13,8 @@
 
 #include "xping.h"
 
+extern int w_width;
+
 void report_init()
 {
 }
@@ -35,7 +37,7 @@ void report_cleanup()
 	ilast = t->npkts;
 
 	DL_FOREACH(list, t) {
-		fprintf(stdout, "%19.19s ", t->host);
+		fprintf(stdout, "%*.*s ", w_width - 1, w_width - 1, t->host);
 		for (i=ifirst; i<ilast; i++) {
 			if (i < t->npkts) fputc(t->res[i % NUM], stdout);
 			else fputc(' ', stdout);

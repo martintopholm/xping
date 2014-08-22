@@ -28,6 +28,8 @@
 static int ifirst_state = -1;
 static int holding_row = 0;
 
+extern int w_width;
+
 #ifndef NCURSES
 static int cursor_y;
 static char *scrbuffer;
@@ -151,7 +153,7 @@ sigwinch(int sig)
 static void
 updatesingle(int ifirst, struct target *t)
 {
-	move(t->row, 20+(t->npkts-1-ifirst));
+	move(t->row, w_width+(t->npkts-1-ifirst));
 	addch(t->res[(t->npkts-1) % NUM]);
 	move(holding_row, 0);
 }
@@ -167,15 +169,15 @@ updatefull(int ifirst, int ilast)
 	DL_FOREACH(list, t) {
 		t->row = row; /* cache for selective updates */
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			mvprintw(row, 0, "%c[2;32m%19.19s%c[0m ",
-			    0x1b, t->host, 0x1b);
+			mvprintw(row, 0, "%c[2;32m%*.*s%c[0m ",
+			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
 		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			mvprintw(row, 0, "%c[2;31m%19.19s%c[0m ",
-			    0x1b, t->host, 0x1b);
+			mvprintw(row, 0, "%c[2;31m%*.*s%c[0m ",
+			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
 		else
-			mvprintw(row, 0, "%19.19s ", t->host);
+			mvprintw(row, 0, "%*.*s ", w_width - 1, w_width - 1, t->host);
 		if (t->duplicate != NULL)
-			mvprintw(row, 20, "(duplicate of %s)", t->duplicate->host);
+			mvprintw(row, w_width, "(duplicate of %s)", t->duplicate->host);
 		else {
 			for (i=ifirst; i<ilast; i++) {
 				if (i < t->npkts)
@@ -250,7 +252,7 @@ termio_update(struct target *selective)
 		return;
 
 	col = getmaxx(stdscr);
-	imax = MIN(t->npkts, col - 20);
+	imax = MIN(t->npkts, col - w_width);
 	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
@@ -295,7 +297,7 @@ termio_cleanup(void)
 		return;
 
 	col = getmaxx(stdscr);
-	imax = MIN(t->npkts, col - 20);
+	imax = MIN(t->npkts, col - w_width);
 	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
@@ -303,13 +305,13 @@ termio_cleanup(void)
 	endwin();
 	DL_FOREACH(list, t) {
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			fprintf(stdout, "%c[2;32m%19.19s%c[0m ",
-			    0x1b, t->host, 0x1b);
+			fprintf(stdout, "%c[2;32m%*.*s%c[0m ",
+			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
 		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			fprintf(stdout, "%c[2;31m%19.19s%c[0m ",
-			    0x1b, t->host, 0x1b);
+			fprintf(stdout, "%c[2;31m%*.*%sc[0m ",
+			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
 		else
-			fprintf(stdout, "%19.19s ", t->host);
+			fprintf(stdout, "%*.*s ", w_width - 1, w_width -1, t->host);
 		if (t->duplicate != NULL)
 			fprintf(stdout, "(duplicate of %s)", t->duplicate->host);
 		else {

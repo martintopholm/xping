@@ -35,6 +35,7 @@ int	C_flag = 0;
 int	T_flag = 0;
 int	v4_flag = 0;
 int	v6_flag = 0;
+int	w_width = 20;
 
 /* Global structures */
 int	fd4, fd4errno;
@@ -292,7 +293,7 @@ main(int argc, char *argv[])
 	setuid(getuid());
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46ACTac:i:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ACTac:i:w:hV")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
@@ -325,6 +326,11 @@ main(int argc, char *argv[])
 				usage("Invalid interval");
 			if (i_interval < 1000 && getuid() != 0)
 				usage("Dangerous interval");
+			break;
+		case 'w':
+			w_width = strtol(optarg, &end, 10);
+			if (*optarg != '\0' && *end != '\0')
+				usage("Invalid width");
 			break;
 		case 'V':
 			fprintf(stderr, "%s %s (built %s)\n", "xping",
