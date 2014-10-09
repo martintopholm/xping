@@ -263,7 +263,7 @@ usage(const char *whine)
 		fprintf(stderr, "%s\n", whine);
 	}
 	fprintf(stderr,
-	    "usage: xping [-46ACTVah] [-c count] [-i interval] host [host [...]]\n"
+	    "usage: xping [-46ACTVah] [-c count] [-i interval] [-w width] host [host [...]]\n"
 	    "\n");
 	exit(EX_USAGE);
 }
@@ -330,6 +330,8 @@ main(int argc, char *argv[])
 		case 'w':
 			w_width = strtol(optarg, &end, 10);
 			if (*optarg != '\0' && *end != '\0')
+				usage("Invalid width");
+			if (w_width < 0)
 				usage("Invalid width");
 			break;
 		case 'V':

@@ -37,7 +37,9 @@ void report_cleanup()
 	ilast = t->npkts;
 
 	DL_FOREACH(list, t) {
-		fprintf(stdout, "%*.*s ", w_width - 1, w_width - 1, t->host);
+		fprintf(stdout, "%*.*s", w_width, w_width, t->host);
+		if (w_width)
+			fputc(' ', stdout);
 		for (i=ifirst; i<ilast; i++) {
 			if (i < t->npkts) fputc(t->res[i % NUM], stdout);
 			else fputc(' ', stdout);

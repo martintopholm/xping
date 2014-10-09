@@ -32,6 +32,7 @@ extern int w_width;
 
 #ifndef NCURSES
 static int cursor_y;
+static int labelwidth;
 static char *scrbuffer;
 struct termios oterm;
 
@@ -150,10 +151,15 @@ sigwinch(int sig)
 }
 #endif /* !NCURSES */
 
+/*
+ * Update a single reponse with redrawing entire output. Initial move
+ * compensates for labelwidth (plus space) and move into the current
+ * packet position.
+ */
 static void
 updatesingle(int ifirst, struct target *t)
 {
-	move(t->row, w_width+(t->npkts-1-ifirst));
+	move(t->row, labelwidth+(t->npkts-1-ifirst));
 	addch(t->res[(t->npkts-1) % NUM]);
 	move(holding_row, 0);
 }
@@ -169,13 +175,15 @@ updatefull(int ifirst, int ilast)
 	DL_FOREACH(list, t) {
 		t->row = row; /* cache for selective updates */
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			mvprintw(row, 0, "%c[2;32m%*.*s%c[0m ",
-			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
+			mvprintw(row, 0, "%c[2;32m%*.*s%c[0m",
+			    0x1b, w_width, w_width, t->host, 0x1b);
 		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			mvprintw(row, 0, "%c[2;31m%*.*s%c[0m ",
-			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
+			mvprintw(row, 0, "%c[2;31m%*.*s%c[0m",
+			    0x1b, w_width, w_width, t->host, 0x1b);
 		else
-			mvprintw(row, 0, "%*.*s ", w_width - 1, w_width - 1, t->host);
+			mvprintw(row, 0, "%*.*s", w_width, w_width, t->host);
+		if (w_width)
+			addch(' ');
 		if (t->duplicate != NULL)
 			mvprintw(row, w_width, "(duplicate of %s)", t->duplicate->host);
 		else {
@@ -234,6 +242,7 @@ termio_init(void)
 #else /* NCURSES */
 	initscr();
 #endif /* !NCURSES */
+	labelwidth = (w_width > 0 ? w_width + 1 : 0);
 }
 
 /*
@@ -252,7 +261,7 @@ termio_update(struct target *selective)
 		return;
 
 	col = getmaxx(stdscr);
-	imax = MIN(t->npkts, col - w_width);
+	imax = MIN(t->npkts, col - labelwidth);
 	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
@@ -297,7 +306,7 @@ termio_cleanup(void)
 		return;
 
 	col = getmaxx(stdscr);
-	imax = MIN(t->npkts, col - w_width);
+	imax = MIN(t->npkts, col - labelwidth );
 	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;
@@ -305,13 +314,15 @@ termio_cleanup(void)
 	endwin();
 	DL_FOREACH(list, t) {
 		if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET6)
-			fprintf(stdout, "%c[2;32m%*.*s%c[0m ",
-			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
+			fprintf(stdout, "%c[2;32m%*.*s%c[0m",
+			    0x1b, w_width, w_width, t->host, 0x1b);
 		else if (C_flag && t->ev_resolve && sa(t)->sa_family == AF_INET)
-			fprintf(stdout, "%c[2;31m%*.*%sc[0m ",
-			    0x1b, w_width - 1, w_width - 1, t->host, 0x1b);
+			fprintf(stdout, "%c[2;31m%*.*%sc[0m",
+			    0x1b, w_width, w_width, t->host, 0x1b);
 		else
-			fprintf(stdout, "%*.*s ", w_width - 1, w_width -1, t->host);
+			fprintf(stdout, "%*.*s", w_width, w_width, t->host);
+		if (w_width)
+			fputc(' ', stdout);
 		if (t->duplicate != NULL)
 			fprintf(stdout, "(duplicate of %s)", t->duplicate->host);
 		else {
