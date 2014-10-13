@@ -105,17 +105,32 @@ readping(int fd, short what, void *thunk)
 	}
 }
 
+/*
+ * Set up regular expressions for matching reply lines, unreachable lines,
+ * and send errors.
+ *
+ * FreeBSD-9:
+ *     64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.030 ms
+ *     ping: sendto: Host is down
+ *
+ * iputils-s20121221:
+ *     64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.027 ms
+ *
+ * iputils-sss20101006
+ *     64 bytes from 127.0.0.1: icmp_req=1 ttl=64 time=0.028 ms
+ *     From 46.30.209.0 icmp_seq=1 Destination Net Unreachable
+ */
 void
 probe_setup(struct event_base *parent_event_base)
 {
 	signal(SIGCHLD, SIG_IGN);
 	if (regcomp(&re_reply,
-	    "[0-9]+ bytes.*seq=([0-9][0-9]*) .*time=([0-9].[0-9]*)",
+	    "[0-9]+ bytes.*icmp_.eq=([0-9][0-9]*) .*time=([0-9].[0-9]*)",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
-	if (regcomp(&re_other, "From .*icmp_seq=([0-9][0-9]*)"
+	if (regcomp(&re_other, "From .*icmp_.eq=([0-9][0-9]*)"
 	    "( Destination Host Unreachable| Destination unreachable| )",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr, "regcomp: error compiling regular expression\n");
