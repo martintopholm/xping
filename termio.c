@@ -185,7 +185,7 @@ updatefull(int ifirst, int ilast)
 		if (w_width)
 			addch(' ');
 		if (t->duplicate != NULL)
-			mvprintw(row, w_width, "(duplicate of %s)", t->duplicate->host);
+			mvprintw(row, labelwidth, "(duplicate of %s)", t->duplicate->host);
 		else {
 			for (i=ifirst; i<ilast; i++) {
 				if (i < t->npkts)
@@ -306,7 +306,7 @@ termio_cleanup(void)
 		return;
 
 	col = getmaxx(stdscr);
-	imax = MIN(t->npkts, col - labelwidth );
+	imax = MIN(t->npkts, col - labelwidth);
 	imax = MIN(imax, NUM);
 	ifirst = (t->npkts > imax ? t->npkts - imax : 0);
 	ilast = t->npkts;

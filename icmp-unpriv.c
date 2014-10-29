@@ -115,10 +115,11 @@ readping(int fd, short what, void *thunk)
  *
  * iputils-s20121221:
  *     64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.027 ms
+ *     From 192.0.2.1 icmp_seq=1 Destination Host Unreachable
  *
  * iputils-sss20101006
  *     64 bytes from 127.0.0.1: icmp_req=1 ttl=64 time=0.028 ms
- *     From 46.30.209.0 icmp_seq=1 Destination Net Unreachable
+ *     From 192.0.2.1 icmp_seq=1 Destination Net Unreachable
  */
 void
 probe_setup(struct event_base *parent_event_base)
