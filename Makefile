@@ -2,7 +2,7 @@
 # Makefile for xping
 #
 
-LIBEVENT=libevent-2.0.18-stable
+LIBEVENT=libevent-2.0.22-stable
 
 PREFIX=/usr/local
 SBINPATH=$(PREFIX)/bin
@@ -58,7 +58,9 @@ check-curses.c:
 	@touch $@
 
 libevent.a:
-	test -f $(LIBEVENT).tar.gz || wget https://github.com/downloads/libevent/libevent/$(LIBEVENT).tar.gz
+	test -f $(LIBEVENT).tar.gz || \
+	    wget https://github.com/downloads/libevent/libevent/$(LIBEVENT).tar.gz || \
+	    wget https://sourceforge.net/projects/levent/files/libevent/libevent-2.0/$(LIBEVENT).tar.gz
 	test -d $(LIBEVENT) || tar -xzvf $(LIBEVENT).tar.gz
 	cd $(LIBEVENT) && ./configure && make
 	cp ./$(LIBEVENT)/.libs/$@ .
