@@ -90,7 +90,9 @@ install: xping xping.8.gz
 	mkdir -p $(SBINPATH)
 	mkdir -p $(MANPATH)/man8
 	install -m 4555 xping $(SBINPATH)/
+	install -m 555 xping-http $(SBINPATH)/
 	install -m 444 xping.8.gz $(MANPATH)/man8/
+	ln -f $(MANPATH)/man8/xping.8.gz $(MANPATH)/man8/xping-http.8.gz
 
 clean:
 	rm -f check-libevent.c check-curses.c \
