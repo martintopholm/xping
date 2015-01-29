@@ -1,5 +1,5 @@
-README
-======
+xping
+=====
 
 xping is a simple PING program continiously probing multiple hosts
 using ICMP-ECHO. As packets are received dots are printed on the screen.
@@ -38,6 +38,13 @@ when it has opened the sockets.
 
 Changes
 -------
+
+v1.3
+
+  * http client probe
+  * label width adjustment
+  * marking of replys arriving after timeout
+  * only open raw socket when needed
 
 v1.2
 

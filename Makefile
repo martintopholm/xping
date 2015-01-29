@@ -12,7 +12,7 @@ LDFLAGS=-L/usr/local/lib -L/usr/local/lib/event2
 DEPS=check-libevent.c
 OBJS=termio.o report.o version.o
 LIBS=-levent
-VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.2`"
+VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.3`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 # Static libevent linking (OSX doesn't use -lrt)
