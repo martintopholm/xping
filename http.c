@@ -103,13 +103,10 @@ session_readcb_status(struct bufferevent *bev, void *thunk)
 		return session_free(session);
 	(void)protocol;
 	(void)number;
-	switch (atoi(number)) {
-	case 200:
+	if (atoi(number) < 400 && atoi(number) >= 200 ) {
 		session->completed = 1;
-		break;
-	default:
+	} else {
 		target_mark(session->t, session->seq, '%');
-		break;
 	}
 	/* Drain the response on future callbacks */
 	bufferevent_setcb(session->bev, session_readcb_drain, NULL,
