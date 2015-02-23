@@ -4,20 +4,20 @@
 
 LIBEVENT=libevent-2.0.22-stable
 
-PREFIX=/usr/local
-SBINPATH=$(PREFIX)/bin
+PREFIX?=/usr/local
+BINPATH=$(PREFIX)/bin
 MANPATH=$(PREFIX)/man
-CFLAGS=-Wall -Werror -I/usr/local/include
-LDFLAGS=-L/usr/local/lib -L/usr/local/lib/event2
-DEPS=check-libevent.c
-OBJS=termio.o report.o version.o
-LIBS=-levent
+CFLAGS+=-Wall -Werror -I/usr/local/include
+LDFLAGS+=-L/usr/local/lib -L/usr/local/lib/event2
+DEPS+=check-libevent.c
+OBJS+=termio.o report.o version.o
+LIBS+=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.3`"
 TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 # Static libevent linking (OSX doesn't use -lrt)
 #CFLAGS+=-I./$(LIBEVENT)/include
-#DEPS=libevent.a
+#DEPS+=libevent.a
 #LIBS=libevent.a -lrt
 
 # Dynamic link and use ncurses
@@ -84,13 +84,13 @@ xping-http: $(DEPS) $(OBJS) xping.o http.o
 	$(CC) $(LDFLAGS) -o $@ $^$> $(LIBS)
 
 xping.8.gz: xping.8
-	gzip -c $^$> > $@
+	gzip -9 -c $^$> > $@
 
-install: xping xping.8.gz
-	mkdir -p $(SBINPATH)
+install:
+	mkdir -p $(BINPATH)
 	mkdir -p $(MANPATH)/man8
-	install -m 4555 xping $(SBINPATH)/
-	install -m 555 xping-http $(SBINPATH)/
+	install -m 4555 xping $(BINPATH)/
+	install -m 555 xping-http $(BINPATH)/
 	install -m 444 xping.8.gz $(MANPATH)/man8/
 	ln -f $(MANPATH)/man8/xping.8.gz $(MANPATH)/man8/xping-http.8.gz
 
