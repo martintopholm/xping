@@ -343,6 +343,7 @@ probe_new(const char *line, void *owner)
 		} else {
 			fprintf(stderr, "probe_add: can't parse %.128s\n",
 			    line);
+			free(prb);
 			return NULL;
 		}
 	} else {
