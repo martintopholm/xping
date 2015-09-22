@@ -196,10 +196,15 @@ static void
 find_marktarget(int af, void *address, int seq, int ch)
 {
 	struct target *t;
+	int npkts;
+
 	t = find(af, address);
 	if (t == NULL)
 		return; /* unknown source address */
-	target_mark(t, seq, ch);
+	npkts = t->npkts;
+	if ((npkts & 0xffff) < seq)
+	    npkts--;
+	target_mark(t, (npkts & ~0xffff) | seq, ch);
 }
 
 /*

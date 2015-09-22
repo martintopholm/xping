@@ -58,6 +58,7 @@ void (*ui_cleanup)(void) = termio_cleanup;
 void
 sigint(int sig)
 {
+
 	event_base_loopexit(ev_base, NULL);
 	signal(SIGINT, SIG_DFL);
 	signal(SIGTERM, SIG_DFL);
