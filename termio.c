@@ -214,11 +214,15 @@ termio_init(void)
 	signal(SIGWINCH, sigwinch);
 	x = getmaxx();
 	y = getmaxy();
-	scrbuffer = malloc(x * y);
-	if (scrbuffer != NULL)
-		setvbuf(stdout, scrbuffer, _IOFBF, x * y);
-	else
-		perror("malloc");
+	if (x > 0 && y > 0) {
+		scrbuffer = malloc(x * y);
+		if (scrbuffer != NULL)
+			setvbuf(stdout, scrbuffer, _IOFBF, x * y);
+		else
+			perror("malloc");
+	} else {
+		scrbuffer = NULL;
+	}
 
 	/* Reserve space on terminal */
 	cursor_y = 0;
