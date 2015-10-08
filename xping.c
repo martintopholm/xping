@@ -292,7 +292,10 @@ main(int argc, char *argv[])
 	fd4errno = errno;
 	fd6 = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	fd6errno = errno;
-	setuid(getuid());
+	if (setuid(getuid()) < 0) {
+		perror("setuid");
+		exit(EX_OSERR);
+	}
 #else /* !DO_SOCK_RAW */
 	fd4 = -1;
 	fd4errno = EAFNOSUPPORT;
