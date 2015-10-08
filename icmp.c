@@ -105,18 +105,18 @@ deactivate(struct target *t)
 	struct target *tmp, *t1;
 
 	HASH_FIND(hh, hash, &t->sa, sizeof(union addr), tmp);
-	if (tmp == t) {
-		HASH_DELETE(hh, hash, t);
-		t1 = NULL;
-		DL_FOREACH(list, tmp) {
-			if (tmp->duplicate == t) {
-				if (t1 == NULL) {
-					t1 = tmp;
-					t1->duplicate = NULL;
-					activate(t1);
-				} else {
-					tmp->duplicate = t1;
-				}
+	if (tmp == NULL)
+		return; /* already inactive, i.e. not in hash */
+	HASH_DELETE(hh, hash, t);
+	t1 = NULL;
+	DL_FOREACH(list, tmp) {
+		if (tmp->duplicate == t) {
+			if (t1 == NULL) {
+				t1 = tmp;
+				t1->duplicate = NULL;
+				activate(t1);
+			} else {
+				tmp->duplicate = t1;
 			}
 		}
 	}
