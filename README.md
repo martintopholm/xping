@@ -57,6 +57,11 @@ when it has opened the sockets.
 Changes
 -------
 
+v1.3.1
+
+  * fix icmp sequence number wrap
+  * fix for http, treat code 200-399 as successful
+
 v1.3
 
   * http client probe
