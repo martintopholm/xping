@@ -72,16 +72,6 @@ target_probe(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 
-	/* Check packet count limit */
-	if (c_count && t->npkts >= c_count) {
-		numcomplete++;
-		event_del(t->ev_write);
-		if (numcomplete >= numtargets) {
-			event_base_loopexit(ev_base, NULL);
-		}
-		return;
-	}
-
 	/* Missed request */
 	if (t->npkts > 0 && GETRES(t, -1) != '.') {
 		if (GETRES(t, -1) == ' ')
@@ -94,6 +84,16 @@ target_probe(int fd, short what, void *thunk)
 		    GETRES(t, -2) != '.' &&
 		    GETRES(t, -1) != '.')
 			write(STDOUT_FILENO, "\a", 1);
+	}
+
+	/* Check packet count limit */
+	if (c_count && t->npkts >= c_count) {
+		numcomplete++;
+		event_del(t->ev_write);
+		if (numcomplete >= numtargets) {
+			event_base_loopexit(ev_base, NULL);
+		}
+		return;
 	}
 
 	/* Transmit request */
