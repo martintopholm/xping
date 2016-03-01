@@ -380,7 +380,6 @@ void probe_send(struct probe *prb, int seq)
 	char buf[512];
 	int salen;
 
-	target_unmark(prb->owner, seq);
 	if (!prb->resolved) {
 		target_mark(prb->owner, seq, '@');
 		return;

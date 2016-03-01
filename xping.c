@@ -97,6 +97,7 @@ target_probe(int fd, short what, void *thunk)
 	}
 
 	/* Transmit request */
+	t->res[t->npkts % NUM] = ' ';
 	probe_send(t->prb, t->npkts);
 	t->npkts++;
 
@@ -141,15 +142,6 @@ target_mark(struct target *t, int seq, int ch)
 		ui_update(t);
 	else
 		ui_update(NULL); /* this is a late reply, need full update to redraw this */
-}
-
-/*
- * Clear a mark, used before sending a new probe
- */
-void
-target_unmark(struct target *t, int seq)
-{
-	t->res[seq % NUM] = ' ';
 }
 
 /*

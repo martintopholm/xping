@@ -260,7 +260,7 @@ probe_send(struct probe *prb, int seq)
 
 	/* Clear ahead to avoid overwriting a result in case of small
 	 * timing indiscrepancies */
-	target_unmark(prb->owner, seq+1);
+	target_mark(prb->owner, seq+1, ' ');
 
 	/* Check for existing ping process */
 	if (prb->pid && kill(prb->pid, 0) == 0)

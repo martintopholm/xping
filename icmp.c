@@ -471,7 +471,6 @@ probe_send(struct probe *prb, int seq)
 		n = write_packet4(sa(prb), seq & 0xffff);
 		len = ICMP_MINLEN + datalen;
 	}
-	target_unmark(prb->owner, seq);
 
 	if (n < 0) {
 		target_mark(prb->owner, seq, '!'); /* transmit error */
