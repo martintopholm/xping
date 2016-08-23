@@ -24,6 +24,10 @@ VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.3.1`"
 #CFLAGS+=-DNCURSES
 #LIBS+=-lcurses
 
+# Enable SSL
+CFLAGS+=-DWITH_SSL
+LIBS+=-levent_openssl -lssl
+
 .PHONY: version.o
 
 all: xping xping.8.gz xping-unpriv xping-http

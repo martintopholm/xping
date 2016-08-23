@@ -14,6 +14,10 @@
 #include <string.h>
 
 #include <event2/event.h>
+#ifdef WITH_SSL
+#include <event2/bufferevent_ssl.h>
+#include <openssl/ssl.h>
+#endif /* WITH_SSL */
 #include <event2/bufferevent.h>
 #include <event2/buffer.h>
 #include <event2/util.h>
@@ -24,6 +28,9 @@ struct probe {
 	int		resolved;
 	union addr	sa;
 	char		query[64];
+#ifdef WITH_SSL
+	SSL_CTX		*ssl_ctx;
+#endif /* WITH_SSL */
 	void		*owner;
 };
 
@@ -33,6 +40,9 @@ struct session {
 	struct bufferevent *bev;
 	struct event	*ev_timeout;
 	int		completed;
+#ifdef WITH_SSL
+	SSL		*ssl;
+#endif /* WITH_SSL */
 };
 
 static regex_t re_target;
@@ -218,13 +228,16 @@ probe_setup()
 {
 	tv_timeout.tv_sec = 3 * i_interval / 1000;
 	tv_timeout.tv_usec = 3 * i_interval % 1000 * 1000;
-	if (regcomp(&re_target, "^(http:(//)?)?"
+	if (regcomp(&re_target, "^(https?:(//)?)?"
             "([0-9A-Za-z.-]+)(\\[([0-9A-Fa-f.:]+)\\])?(:[0-9]+)?(/[^ ]*)?$",
 	    REG_EXTENDED | REG_NEWLINE) != 0) {
 		fprintf(stderr,
 		    "regcomp: error compiling regular expression\n");
 		exit(1);
 	}
+#ifdef WITH_SSL
+	SSL_library_init();
+#endif /* WITH_SSL */
 }
 
 /*
@@ -292,11 +305,33 @@ probe_new(const char *line, void *owner)
 	}
 	prb->owner = owner;
 
+	if (line[match[RE_PROTO].rm_so + 4] == 's') {
+#ifdef WITH_SSL
+		long ssl_options;
+		prb->ssl_ctx = SSL_CTX_new(SSLv23_method());
+		if (prb->ssl_ctx == NULL) {
+			perror("probe_add: SSL_CTX_new");
+			return NULL;
+		}
+		ssl_options = SSL_CTX_get_options(prb->ssl_ctx);
+		ssl_options |= SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1;
+		SSL_CTX_set_options(prb->ssl_ctx, ssl_options);
+#else /* !WITH_SSL */
+		free(prb);
+		fprintf(stderr, "probe_add: ssl support not compiled in\n");
+		return NULL;
+#endif /* WITH_SSL */
+	}
+
 	strncat(prb->host, line + match[RE_HOST].rm_so,
 	    MIN(sizeof(prb->host) - 1,
 	    match[RE_HOST].rm_eo - match[RE_HOST].rm_so));
 	if (match[RE_PORT].rm_so  != -1)
 		port = strtol(line + match[RE_PORT].rm_so + 1, &end, 10);
+#ifdef WITH_SSL
+	else if (prb->ssl_ctx != NULL)
+		port = 443;
+#endif /* !WITH_SSL */
 	else
 		port = 80;
 
@@ -391,8 +426,26 @@ void probe_send(struct probe *prb, int seq)
 	}
 	session->prb = prb;
 	session->seq = seq;
+#ifdef WITH_SSL
+	if (prb->ssl_ctx != NULL) {
+		/* TODO: properly free SSL contexts on failure */
+		session->ssl = SSL_new(prb->ssl_ctx);
+		if (session->ssl == NULL) {
+			target_mark(prb->owner, seq, '!');
+			free(session);
+			return;
+		}
+		session->bev = bufferevent_openssl_socket_new(ev_base, -1,
+		    session->ssl, BUFFEREVENT_SSL_CONNECTING,
+		    BEV_OPT_DEFER_CALLBACKS);
+	} else {
+		session->bev = bufferevent_socket_new(ev_base, -1,
+		    BEV_OPT_CLOSE_ON_FREE);
+	}
+#else /* !WITH_SSL */
 	session->bev = bufferevent_socket_new(ev_base, -1,
 	    BEV_OPT_CLOSE_ON_FREE);
+#endif
 	if (session->bev == NULL) {
 		target_mark(prb->owner, seq, '!');
 		free(session);
