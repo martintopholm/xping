@@ -13,7 +13,6 @@ DEPS+=check-libevent.c
 OBJS+=termio.o report.o version.o dnstask.o
 LIBS+=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.3.1`"
-TIMESTAMP="`date +%Y%m%dT%H%M%S`"
 
 # Static libevent linking (OSX doesn't use -lrt)
 #CFLAGS+=-I./$(LIBEVENT)/include
@@ -67,9 +66,8 @@ libevent.a:
 	size $@
 
 version.o:
-	(printf "const char version[] = \"%s\";\n" $(VERSION); \
-	 printf "const char built[] = \"%s\";\n" $(TIMESTAMP)) | \
-	 $(CC) -x c -c -o $@ -
+	printf "const char version[] = \"%s\";\n" $(VERSION) | \
+	    $(CC) -x c -c -o $@ -
 
 xping-raw.o: xping.c
 	$(CC) $(CFLAGS) -DDO_SOCK_RAW -c -o $@ $^$>

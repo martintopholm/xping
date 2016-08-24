@@ -51,7 +51,6 @@ void target_resolved(struct target *, int, void *);
 
 /* from "version.c" */
 extern const char version[];
-extern const char built[];
 
 /* from termio.c */
 void termio_init(void);

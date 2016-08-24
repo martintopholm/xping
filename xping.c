@@ -264,8 +264,7 @@ main(int argc, char *argv[])
 				usage("Invalid width");
 			break;
 		case 'V':
-			fprintf(stderr, "%s %s (built %s)\n", "xping",
-			    version, built);
+			fprintf(stderr, "%s %s\n", "xping", version);
 			return (0);
 		case 'h':
 			usage(NULL);
