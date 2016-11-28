@@ -43,7 +43,8 @@ use ncurses.
 
 xping depends on libevent, if you don't have it you can uncomment the
 "static linking" option in the Makefile to have it downloaded and linked
-static into xping. OSX doesn't use -lrt.
+static into xping. OSX doesn't use -lrt, but may need
+-Wno-deprecated-declarations in order to build WITH_SSL.
 
     vi Makefile
     make

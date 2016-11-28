@@ -19,12 +19,14 @@ VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.3.1`"
 #DEPS+=libevent.a
 #LIBS=libevent.a -lrt
 
-# Dynamic link and use ncurses
+# Link with ncurses
 #DEPS+=check-curses.c
 #CFLAGS+=-DNCURSES
 #LIBS+=-lcurses
 
-# Enable SSL
+# Enable SSL (OSX may need -Wno-deprecated-declarations)
+#CFLAGS+=-Wno-deprecated-declarations
+DEPS+=check-openssl.c
 CFLAGS+=-DWITH_SSL
 LIBS+=-levent_openssl -lssl
 
@@ -56,6 +58,20 @@ check-curses.c:
 	 (echo no; \
 	  echo ""; \
 	  echo "libcurses not available in usual locations"; \
+	  echo "adjust CFLAGS and LDFLAGS appropriately"; \
+	  echo ""; false)
+	@touch $@
+
+check-openssl.c:
+	@/bin/echo -n 'Checking for openssl... '; \
+	 (echo '#include <stdio.h>'; \
+	  echo '#include <openssl/ssl.h>'; \
+	  echo 'int main()'; \
+	  echo '{ printf("%d\\n", SSL_library_init()); return 0; }' \
+	 ) | $(CC) $(CFLAGS) $(LDFLAGS) -x c -o /dev/null - -lssl >/dev/null 2>/dev/null && echo yes || \
+	 (echo no; \
+	  echo ""; \
+	  echo "openssl not available in usual locations"; \
 	  echo "adjust CFLAGS and LDFLAGS appropriately"; \
 	  echo ""; false)
 	@touch $@
@@ -97,13 +113,13 @@ install:
 	ln -f $(MANPATH)/man8/xping.8.gz $(MANPATH)/man8/xping-http.8.gz
 
 clean:
-	rm -f check-libevent.c check-curses.c \
+	rm -f check-libevent.c check-curses.c check-openssl.c \
 	      xping xping.8.gz xping-http xping-unpriv \
 	      xping.o xping-raw.o http.o icmp.o icmp-unpriv.o \
 	      $(OBJS)
 
 # Object dependencies (gcc -MM *.c)
-dnstask.o: dnstask.c
+dnstask.o: dnstask.c xping.h uthash.h utlist.h
 http.o: http.c xping.h uthash.h utlist.h
 icmp.o: icmp.c xping.h uthash.h utlist.h
 icmp-unpriv.o: icmp-unpriv.c xping.h uthash.h utlist.h
