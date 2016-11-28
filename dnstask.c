@@ -27,8 +27,6 @@ extern int T_flag;
 extern struct event_base *ev_base;
 extern struct evdns_base *dns;
 
-typedef void (*dnstask_cb_type)(int af, void *address, void *arg);
-
 struct dnstask {
 	dnstask_cb_type	cb;
 	void		*thunk;
