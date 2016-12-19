@@ -88,10 +88,43 @@ clrtoeol(void)
 	fprintf(stdout, "%c[K", 0x1b);
 }
 
+/*
+ * Return a color based on success/failure
+*/
+static char *
+getcolor(char c) {
+    switch(c) {
+        case '.':
+			return "\x1b[2;34m"; // blue
+        case ':':
+			return "\x1b[6;33m"; // yellow
+        case '?':
+        case '#':
+			return "\x1b[1;31m"; // red
+        case '%':
+			return "\x1b[2;35m"; // magento
+        case '@':
+			return "\x1b[5;32m"; // green
+        case '!':
+			return "\x1b[3;31m"; // red
+        case '"':
+			return "\x1b[5;33m"; // yellow
+    }
+    return "";
+}
+
 static void
 addch(int ch)
 {
+	if (AC_flag) {
+		printf("%s", getcolor(ch));
+	}
+
 	fputc(ch, stdout);
+
+	if (AC_flag) {
+		printf("%c[0m", 0x1b);
+	}
 }
 
 static void

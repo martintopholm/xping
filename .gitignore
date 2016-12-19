@@ -1,0 +1,5 @@
+*.o
+*.swp
+xping
+xping-http
+xping.8.gz
