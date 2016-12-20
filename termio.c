@@ -369,21 +369,17 @@ termio_cleanup(void)
 			fprintf(stdout, "%c[2;32m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
 		else if (C_flag && t->af == AF_INET)
-			fprintf(stdout, "%c[2;31m%*.*%sc[0m",
+			fprintf(stdout, "%c[2;31m%*.*s%c[0m",
 			    0x1b, w_width, w_width, t->host, 0x1b);
 		else
 			fprintf(stdout, "%*.*s", w_width, w_width, t->host);
 		if (w_width)
 			fputc(' ', stdout);
-		if (t->duplicate != NULL)
-			fprintf(stdout, "(duplicate of %s)", t->duplicate->host);
-		else {
-			for (i=ifirst; i<ilast; i++) {
-				if (i < t->npkts)
-					fputc(t->res[i % NUM], stdout);
-				else
-					fputc(' ', stdout);
-			}
+		for (i=ifirst; i<ilast; i++) {
+			if (i < t->npkts)
+				fputc(t->res[i % NUM], stdout);
+			else
+				fputc(' ', stdout);
 		}
 		fputc('\n', stdout);
 	}
