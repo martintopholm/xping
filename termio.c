@@ -116,13 +116,13 @@ getcolor(char c) {
 static void
 addch(int ch)
 {
-	if (AC_flag) {
+	if (B_flag) {
 		printf("%s", getcolor(ch));
 	}
 
 	fputc(ch, stdout);
 
-	if (AC_flag) {
+	if (B_flag) {
 		printf("%c[0m", 0x1b);
 	}
 }

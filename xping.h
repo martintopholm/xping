@@ -15,8 +15,8 @@
 
 extern struct event_base *ev_base;
 extern struct target *list;
+extern int B_flag;
 extern int C_flag;
-extern int AC_flag;
 extern int i_interval;
 extern int numtargets;
 extern int fd4, fd4errno;

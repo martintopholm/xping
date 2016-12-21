@@ -31,8 +31,8 @@ int	i_interval = 1000;
 int	a_flag = 0;
 int	c_count = 0;
 int	A_flag = 0;
+int	B_flag = 0;
 int	C_flag = 0;
-int	AC_flag = 0;
 int	T_flag = 0;
 int	v4_flag = 0;
 int	v6_flag = 0;
@@ -239,11 +239,11 @@ main(int argc, char *argv[])
 		case 'A':
 			A_flag++;
 			break;
+		case 'B':
+			B_flag = 1;
+			break;
 		case 'C':
 			C_flag = 1;
-			break;
-		case 'B':
-			AC_flag = 1;
 			break;
 		case 'c':
 			c_count = strtol(optarg, &end, 10);
