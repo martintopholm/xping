@@ -111,11 +111,15 @@ session_readcb_status(struct bufferevent *bev, void *thunk)
 	}
 	/* Parse response line */
 	protocol = strsep(&line, " ");
-	if (line == NULL)
-		return session_free(session);
+	if (line == NULL) {
+		session_free(session);
+		return;
+	}
 	number = strsep(&line, " ");
-	if (line == NULL)
-		return session_free(session);
+	if (line == NULL) {
+		session_free(session);
+		return;
+	}
 	(void)protocol;
 	(void)number;
 	if (atoi(number) < 400 && atoi(number) >= 200 ) {
