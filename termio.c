@@ -95,20 +95,20 @@ static char *
 getcolor(char c) {
     switch(c) {
         case '.':
-			return "\x1b[2;34m"; // blue
+			return "\x1b[2;34m"; /* blue */
         case ':':
-			return "\x1b[6;33m"; // yellow
+			return "\x1b[6;33m"; /* yellow */
         case '?':
         case '#':
-			return "\x1b[1;31m"; // red
+			return "\x1b[1;31m"; /* red */
         case '%':
-			return "\x1b[2;35m"; // magento
+			return "\x1b[2;35m"; /* magenta */
         case '@':
-			return "\x1b[5;32m"; // green
+			return "\x1b[5;32m"; /* green */
         case '!':
-			return "\x1b[3;31m"; // red
+			return "\x1b[3;31m"; /* red */
         case '"':
-			return "\x1b[5;33m"; // yellow
+			return "\x1b[5;33m"; /* yellow */
     }
     return "";
 }
