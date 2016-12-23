@@ -91,7 +91,19 @@ clrtoeol(void)
 static void
 addch(int ch)
 {
+
 	fputc(ch, stdout);
+}
+
+static void
+printw(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stdout, "%c[K", 0x1b);
+	va_start(ap, fmt);
+	vfprintf(stdout, fmt, ap);
+	va_end(ap);
 }
 
 static void
@@ -151,6 +163,46 @@ sigwinch(int sig)
 }
 #endif /* !NCURSES */
 
+
+/*
+ * Return a color based on success/failure
+*/
+static char *
+getcolor(int ch)
+{
+
+	switch(ch) {
+	case '.':
+		return "\x1b[2;34m"; /* blue */
+	case ':':
+		return "\x1b[6;33m"; /* yellow */
+	case '?':
+	case '#':
+		return "\x1b[1;31m"; /* red */
+	case '%':
+		return "\x1b[2;35m"; /* magenta */
+	case '@':
+		return "\x1b[5;32m"; /* green */
+	case '!':
+		return "\x1b[3;31m"; /* red */
+	case '"':
+		return "\x1b[5;33m"; /* yellow */
+	}
+	return "";
+}
+
+static void
+drawchar(int ch)
+{
+
+
+	if (!B_flag) {
+		addch(ch);
+	} else {
+		printw("%s%c\x1b[0m", getcolor(ch), ch);
+	}
+}
+
 /*
  * Update a single reponse with redrawing entire output. Initial move
  * compensates for labelwidth (plus space) and move into the current
@@ -160,7 +212,7 @@ static void
 updatesingle(int ifirst, struct target *t)
 {
 	move(t->row, labelwidth+(t->npkts-1-ifirst));
-	addch(t->res[(t->npkts-1) % NUM]);
+	drawchar(t->res[(t->npkts-1) % NUM]);
 	move(holding_row, 0);
 }
 
@@ -183,12 +235,12 @@ updatefull(int ifirst, int ilast)
 		else
 			mvprintw(row, 0, "%*.*s", w_width, w_width, t->host);
 		if (w_width)
-			addch(' ');
+			drawchar(' ');
 		for (i=ifirst; i<ilast; i++) {
 			if (i < t->npkts)
-				addch(t->res[i % NUM]);
+				drawchar(t->res[i % NUM]);
 			else
-				addch(' ');
+				drawchar(' ');
 		}
 		move(++row, 0);
 	}

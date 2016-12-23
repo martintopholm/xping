@@ -31,6 +31,7 @@ int	i_interval = 1000;
 int	a_flag = 0;
 int	c_count = 0;
 int	A_flag = 0;
+int	B_flag = 0;
 int	C_flag = 0;
 int	T_flag = 0;
 int	v4_flag = 0;
@@ -182,7 +183,7 @@ usage(const char *whine)
 		fprintf(stderr, "%s\n", whine);
 	}
 	fprintf(stderr,
-	    "usage: xping [-46ACTVah] [-c count] [-i interval] [-w width] host [host [...]]\n"
+	    "usage: xping [-46ABCTVah] [-c count] [-i interval] [-w width] host [host [...]]\n"
 	    "\n");
 	exit(EX_USAGE);
 }
@@ -222,7 +223,7 @@ main(int argc, char *argv[])
 #endif /* DO_SOCK_RAW */
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46ACTac:i:w:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ABCTac:i:w:hV")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
@@ -237,6 +238,9 @@ main(int argc, char *argv[])
 			break;
 		case 'A':
 			A_flag++;
+			break;
+		case 'B':
+			B_flag = 1;
 			break;
 		case 'C':
 			C_flag = 1;
