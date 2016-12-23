@@ -58,6 +58,13 @@ when it has opened the sockets.
 Changes
 -------
 
+v1.4.0
+
+  * add openssl support (see -DWITH_SSL in Makefile)
+  * add colorsupport for results
+  * fixed missed packet checking before -c count limit
+  * fix startup bell for -aa
+
 v1.3.1
 
   * fix icmp sequence number wrap
