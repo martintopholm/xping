@@ -78,13 +78,13 @@ target_probe(int fd, short what, void *thunk)
 		if (GETRES(t, -1) == ' ')
 			target_mark(t, t->npkts - 1, '?');
 		if (A_flag == 1)
-			write(STDOUT_FILENO, "\a", 1);
+			(void)write(STDOUT_FILENO, "\a", 1);
 		else if (A_flag >= 2 &&
 		    GETRES(t, -4) == '.' &&
 		    GETRES(t, -3) == '.' &&
 		    GETRES(t, -2) != '.' &&
 		    GETRES(t, -1) != '.')
-			write(STDOUT_FILENO, "\a", 1);
+			(void)write(STDOUT_FILENO, "\a", 1);
 	}
 
 	/* Check packet count limit */
@@ -130,13 +130,13 @@ target_mark(struct target *t, int seq, int ch)
 		t->res[seq % NUM] = ch;
 	if (a_flag && ch == '.') {
 		if (a_flag == 1)
-			write(STDOUT_FILENO, "\a", 1);
+			(void)write(STDOUT_FILENO, "\a", 1);
 		else if (a_flag >=2 && t->npkts >= 4 &&
 		    t->res[(seq-3) % NUM] != '.' &&
 		    t->res[(seq-2) % NUM] != '.' &&
 		    t->res[(seq-1) % NUM] == '.' &&
 		    t->res[(seq-0) % NUM] == '.')
-			write(STDOUT_FILENO, "\a", 1);
+			(void)write(STDOUT_FILENO, "\a", 1);
 	}
 
 	if (seq == t->npkts - 1)
