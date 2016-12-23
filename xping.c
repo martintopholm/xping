@@ -183,7 +183,8 @@ usage(const char *whine)
 		fprintf(stderr, "%s\n", whine);
 	}
 	fprintf(stderr,
-	    "usage: xping [-46ABCTVah] [-c count] [-i interval] [-w width] host [host [...]]\n"
+	    "usage: xping [-46ABCTVah] [-c count] [-i interval] [-w width] "
+	    "host [host [...]]\n"
 	    "\n");
 	exit(EX_USAGE);
 }
@@ -223,7 +224,7 @@ main(int argc, char *argv[])
 #endif /* DO_SOCK_RAW */
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "46ABCTac:i:w:hV")) != -1) {
+	while ((ch = getopt(argc, argv, "46ABCTVahc:i:w:")) != -1) {
 		switch(ch) {
 		case '4':
 			v4_flag = 1;
