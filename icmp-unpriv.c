@@ -18,6 +18,7 @@
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include "xping.h"
+#include "tricks.h"
 
 struct probe {
 	char		host[MAXHOST];
@@ -27,6 +28,7 @@ struct probe {
 	int		fd;
 	int		seqdelta;
 	int		seqlast;
+	int		early_mark;
 	struct evbuffer	*evbuf;
 	void		*owner;
 };
@@ -105,6 +107,16 @@ readping(int fd, short what, void *thunk)
 			 * first packet has icmp_seq=0 instead of 1 */
 			if (prb->seqlast < 32768 && seq == 0)
 				prb->seqdelta++;
+			/*
+			 * seq newer than last sent, thus packet arrived too
+			 * early (before probe_send. Cached mark until
+			 * probe_send is called next_time.
+			 */
+			if (prb->seqlast < seq + prb->seqdelta) {
+				AZ(prb->early_mark == '\0');
+				prb->early_mark = mark;
+				return;
+			}
 			target_mark(prb->owner, seq + prb->seqdelta, mark);
 
 			/* Check for timing drift: If packet isn't the
@@ -261,6 +273,12 @@ probe_send(struct probe *prb, int seq)
 	/* Clear ahead to avoid overwriting a result in case of small
 	 * timing indiscrepancies */
 	target_mark(prb->owner, seq+1, ' ');
+
+	/* If we have a cached early mark, send it right away. */
+	if (prb->early_mark != '\0') {
+		target_mark(prb->owner, seq, prb->early_mark);
+		prb->early_mark = '\0';
+	}
 
 	/* Check for existing ping process */
 	if (prb->pid && kill(prb->pid, 0) == 0)
