@@ -229,7 +229,8 @@ static struct testcase_setup_t tc_setup = {setup, cleanup};
 
 struct testcase_t tc_blackbox[] = {
 	{"xping-localhost", test_xping_localhost, 0, &tc_setup},
-	{"xping-unpriv-localhost", test_xping_unpriv_localhost, 0, &tc_setup},
+	{"xping-unpriv-localhost", test_xping_unpriv_localhost,
+	    TT_OFF_BY_DEFAULT, &tc_setup},
 	{"xping-http-localhost", test_xping_http_localhost, 0, &tc_setup},
 	END_OF_TESTCASES
 };
