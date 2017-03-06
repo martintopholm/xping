@@ -7,7 +7,7 @@ PROFDATA=xping.profdata xping-unpriv.profdata xping-http.profdata
 test: tinytest
 	test ! -O ../xping || sudo chown root ../xping
 	test -u ../xping || sudo chmod 4750 ../xping
-	./tinytest
+	./tinytest || (find test/test.?????? -type f -print0 | xargs -0 head -50; exit 123)
 
 tinytest: check_blackbox.c tests.c tinytest.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^$>
