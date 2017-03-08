@@ -1,0 +1,8 @@
+---
+addons:
+  apt:
+    packages:
+      - libevent-2.0
+compiler: clang
+language: c
+sudo: required

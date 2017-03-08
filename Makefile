@@ -9,6 +9,7 @@ BINPATH=$(PREFIX)/bin
 MANPATH=$(PREFIX)/man
 CFLAGS+=-Wall -Werror -Wpedantic -I/usr/local/include
 LDFLAGS+=-L/usr/local/lib -L/usr/local/lib/event2
+COVFLAGS=-fprofile-instr-generate -fcoverage-mapping
 DEPS+=check-libevent.c
 OBJS+=termio.o report.o version.o dnstask.o
 LIBS+=-levent
@@ -30,7 +31,7 @@ DEPS+=check-openssl.c
 CFLAGS+=-DWITH_SSL
 LIBS+=-levent_openssl -lssl
 
-.PHONY: version.o
+.PHONY: version.o all install test test_coverage clean
 
 all: xping xping.8.gz xping-unpriv xping-http
 
@@ -113,10 +114,19 @@ install:
 	ln -f $(MANPATH)/man8/xping.8.gz $(MANPATH)/man8/xping-http.8.gz
 
 clean:
+	make -C test clean
 	rm -f check-libevent.c check-curses.c check-openssl.c \
 	      xping xping.8.gz xping-http xping-unpriv \
 	      xping.o xping-raw.o http.o icmp.o icmp-unpriv.o \
 	      $(OBJS)
+
+test:
+	make -C test test
+
+test_coverage:
+	env CFLAGS="$$CFLAGS $(COVFLAGS)" LDFLAGS="$$LDFLAGS $(COVFLAGS)" \
+	    make -C . clean test
+	make -C test test coverage
 
 # Object dependencies (gcc -MM *.c)
 dnstask.o: dnstask.c xping.h uthash.h utlist.h
