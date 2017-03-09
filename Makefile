@@ -3,6 +3,7 @@
 #
 
 LIBEVENT=libevent-2.0.22-stable
+LIBEVENTDIR=release-2.0.22-stable
 
 PREFIX?=/usr/local
 BINPATH=$(PREFIX)/bin
@@ -79,7 +80,7 @@ check-openssl.c:
 
 libevent.a:
 	test -f $(LIBEVENT).tar.gz || \
-	    wget https://github.com/downloads/libevent/libevent/$(LIBEVENT).tar.gz || \
+		wget https://github.com/libevent/libevent/releases/download/$(LIBEVENTDIR)/$(LIBEVENT).tar.gz || \
 	    wget https://sourceforge.net/projects/levent/files/libevent/libevent-2.0/$(LIBEVENT).tar.gz
 	test -d $(LIBEVENT) || tar -xzvf $(LIBEVENT).tar.gz
 	cd $(LIBEVENT) && ./configure && make
