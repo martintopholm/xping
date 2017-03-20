@@ -16,21 +16,26 @@ OBJS+=termio.o report.o version.o dnstask.o
 LIBS+=-levent
 VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.4.0`"
 
-# Static libevent linking (OSX doesn't use -lrt)
-#CFLAGS+=-I./$(LIBEVENT)/include
-#DEPS+=libevent.a
-#LIBS=libevent.a -lrt
-
 # Link with ncurses
 #DEPS+=check-curses.c
 #CFLAGS+=-DNCURSES
 #LIBS+=-lcurses
 
-# Enable SSL (OSX may need -Wno-deprecated-declarations)
+# Dynamic libevent_openssl linking
+# (OSX may need -Wno-deprecated-declarations)
 #CFLAGS+=-Wno-deprecated-declarations
 DEPS+=check-openssl.c
 CFLAGS+=-DWITH_SSL
 LIBS+=-levent_openssl -lssl
+
+# Static libevent linking (OSX doesn't use -lrt)
+#CFLAGS+=-I./$(LIBEVENT)/include
+#DEPS=libevent.a
+#LIBS=-lrt
+# Static libevent_openssl linking
+#DEPS+=check-openssl.c libevent_openssl.a
+#CFLAGS+=-DWITH_SSL
+#LIBS+=-lssl -lcrypto
 
 .PHONY: version.o all install test test_coverage clean
 
@@ -78,12 +83,14 @@ check-openssl.c:
 	  echo ""; false)
 	@touch $@
 
-libevent.a:
+$(LIBEVENT)/.libs:
 	test -f $(LIBEVENT).tar.gz || \
 		wget https://github.com/libevent/libevent/releases/download/$(LIBEVENTDIR)/$(LIBEVENT).tar.gz || \
 	    wget https://sourceforge.net/projects/levent/files/libevent/libevent-2.0/$(LIBEVENT).tar.gz
 	test -d $(LIBEVENT) || tar -xzvf $(LIBEVENT).tar.gz
-	cd $(LIBEVENT) && ./configure && make
+	test -f ./$(LIBEVENT)/.libs/$@ || cd $(LIBEVENT) && ./configure && make
+
+libevent.a libevent_openssl.a: $(LIBEVENT)
 	cp ./$(LIBEVENT)/.libs/$@ .
 	size $@
 
@@ -94,13 +101,13 @@ version.o:
 xping-raw.o: xping.c
 	$(CC) $(CFLAGS) -DDO_SOCK_RAW -c -o $@ $^$>
 
-xping: $(DEPS) $(OBJS) xping-raw.o icmp.o
+xping: xping-raw.o icmp.o $(OBJS) $(DEPS)
 	$(CC) $(LDFLAGS) -o $@ $^$> $(LIBS)
 
-xping-unpriv: $(DEPS) $(OBJS) xping.o icmp-unpriv.o
+xping-unpriv: xping.o icmp-unpriv.o $(OBJS) $(DEPS)
 	$(CC) $(LDFLAGS) -o $@ $^$> $(LIBS)
 
-xping-http: $(DEPS) $(OBJS) xping.o http.o
+xping-http: xping.o http.o $(OBJS) $(DEPS)
 	$(CC) $(LDFLAGS) -o $@ $^$> $(LIBS)
 
 xping.8.gz: xping.8
@@ -116,10 +123,9 @@ install:
 
 clean:
 	make -C test clean
-	rm -f check-libevent.c check-curses.c check-openssl.c \
-	      xping xping.8.gz xping-http xping-unpriv \
+	rm -f xping xping.8.gz xping-http xping-unpriv \
 	      xping.o xping-raw.o http.o icmp.o icmp-unpriv.o \
-	      $(OBJS)
+	      $(OBJS) $(DEPS)
 
 test:
 	make -C test test
