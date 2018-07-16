@@ -441,7 +441,7 @@ void probe_send(struct probe *prb, int seq)
 		}
 		session->bev = bufferevent_openssl_socket_new(ev_base, -1,
 		    session->ssl, BUFFEREVENT_SSL_CONNECTING,
-		    BEV_OPT_DEFER_CALLBACKS);
+		    BEV_OPT_DEFER_CALLBACKS | BEV_OPT_CLOSE_ON_FREE);
 	} else {
 		session->bev = bufferevent_socket_new(ev_base, -1,
 		    BEV_OPT_CLOSE_ON_FREE);
