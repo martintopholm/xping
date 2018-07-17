@@ -130,6 +130,7 @@ session_readcb_status(struct bufferevent *bev, void *thunk)
 	/* Drain the response on future callbacks */
 	bufferevent_setcb(session->bev, session_readcb_drain, NULL,
 	    session_eventcb, session);
+	session_readcb_drain(bev, session);
 }
 
 /*
@@ -185,6 +186,9 @@ static void
 session_timeout(int fd, short what, void *thunk)
 {
 	struct session *session = thunk;
+
+	if (session->completed)
+		target_mark(session->prb->owner, session->seq, '?');
 	session_free(session);
 }
 
@@ -432,7 +436,6 @@ void probe_send(struct probe *prb, int seq)
 	session->seq = seq;
 #ifdef WITH_SSL
 	if (prb->ssl_ctx != NULL) {
-		/* TODO: properly free SSL contexts on failure */
 		session->ssl = SSL_new(prb->ssl_ctx);
 		if (session->ssl == NULL) {
 			target_mark(prb->owner, seq, '!');
