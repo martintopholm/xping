@@ -132,7 +132,7 @@ test:
 
 test_coverage:
 	env CFLAGS="$$CFLAGS $(COVFLAGS)" LDFLAGS="$$LDFLAGS $(COVFLAGS)" \
-	    make -C . clean test
+	    make -C . clean all
 	make -C test test coverage
 
 # Object dependencies (gcc -MM *.c)
