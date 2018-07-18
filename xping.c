@@ -23,6 +23,9 @@
 
 #include "xping.h"
 
+extern char *optarg;
+extern int optind;
+
 #define SETRES(t,i,r) t->res[(t->npkts+i) % NUM] = r
 #define GETRES(t,i) t->res[(t->npkts+i) % NUM]
 

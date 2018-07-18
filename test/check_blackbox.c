@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 
 #include <arpa/inet.h>
@@ -14,7 +15,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "tricks.h"
 #include "tinytest.h"
 #include "tinytest_macros.h"
 
@@ -160,7 +160,7 @@ test_xping_http_localhost(void *ctx_)
 
 	listen_port = 0;
 	fd_srv = sock_listen(&listen_port);
-	bprintf(url, "http://127.0.0.1:%hu", listen_port);
+	snprintf(url, sizeof(url), "http://127.0.0.1:%hu", listen_port);
 
 	strcpy(ctx->name, "xping-http");
 	pid = exec_wd(NULL, "../../xping-http", "-c", "10", url, NULL);
@@ -192,7 +192,7 @@ cleanup(const struct testcase_t *testcase, void *ctx_)
 	struct context *ctx = ctx_;
 	char buf[FILENAME_MAX];
 
-	bprintf(buf, "%s.profraw", ctx->name);
+	snprintf(buf, sizeof(buf), "%s.profraw", ctx->name);
 	rename("default.profraw", buf);
 	if (ctx->path[0])
 		if (chdir("..") < 0)
