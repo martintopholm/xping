@@ -31,9 +31,12 @@ struct probe {
 	struct probe	*duplicate;
 	int		last_seq;
 	UT_hash_handle	hh;
+	void		*dnstask;
 	void		*owner;
 };
 
+struct event *ev_read4;
+struct event *ev_read6;
 struct probe *hash = NULL;
 char	outpacket[IP_MAXPACKET];
 char	outpacket6[IP_MAXPACKET];
@@ -375,7 +378,6 @@ resolved(int af, void *address, void *thunk)
 void
 probe_setup()
 {
-	struct event *ev;
 	int i;
 
 	if (fd4 < 0) {
@@ -397,11 +399,22 @@ probe_setup()
 	}
 
 	evutil_make_socket_nonblocking(fd4);
-	ev = event_new(ev_base, fd4, EV_READ|EV_PERSIST, read_packet4, NULL);
-	event_add(ev, NULL);
+	ev_read4 = event_new(ev_base, fd4, EV_READ|EV_PERSIST, read_packet4, NULL);
+	event_add(ev_read4, NULL);
 	evutil_make_socket_nonblocking(fd6);
-	ev = event_new(ev_base, fd6, EV_READ|EV_PERSIST, read_packet6, NULL);
-	event_add(ev, NULL);
+	ev_read6 = event_new(ev_base, fd6, EV_READ|EV_PERSIST, read_packet6, NULL);
+	event_add(ev_read6, NULL);
+}
+
+void
+probe_cleanup()
+{
+
+	HASH_CLEAR(hh, hash);
+	if (ev_read4)
+		event_free(ev_read4);
+	if (ev_read6)
+		event_free(ev_read6);
 }
 
 /*
@@ -436,12 +449,23 @@ probe_new(const char *line, void *owner)
 		prb->resolved = 1;
 		activate(prb);
 	} else {
-		if (dnstask_new(prb->host, resolved, prb) == NULL) {
+		prb->dnstask = dnstask_new(prb->host, resolved, prb);
+		if (prb->dnstask == NULL) {
 			free(prb);
 			return NULL;
 		}
 	}
 	return (prb);
+}
+
+void
+probe_free(struct probe *prb)
+{
+
+	if (prb->dnstask)
+		dnstask_free(prb->dnstask);
+	deactivate(prb);
+	free(prb);
 }
 
 /*

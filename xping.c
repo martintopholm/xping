@@ -130,6 +130,7 @@ target_probe_sched(int fd, short what, void *thunk)
 {
 	struct target *t = thunk;
 
+	event_free(t->ev_write);
 	t->ev_write = event_new(ev_base, -1, EV_PERSIST, target_probe, t);
 	event_add(t->ev_write, &tv_interval);
 	target_probe(fd, what, thunk);
@@ -187,10 +188,35 @@ target_add(const char *line)
 	strncat(t->host, line, sizeof(t->host) - 1);
 	DL_APPEND(list, t);
 	t->prb = probe_new(line, t);
-	if (t->prb == NULL)
+	if (t->prb == NULL) {
+		free(t);
 		return -1;
+	}
 	numtargets++;
 	return 0;
+}
+
+/*
+ * Clean and free global resources
+ */
+static void
+cleanup(void)
+{
+	struct target *t, *t_tmp;
+
+	DL_FOREACH_SAFE(list, t, t_tmp) {
+		event_free(t->ev_write);
+		probe_free(t->prb);
+		free(t);
+	}
+	probe_cleanup();
+	evdns_base_free(dns, 0);
+	event_base_free(ev_base);
+#ifdef libevent_global_shutdown
+	libevent_global_shutdown();
+#endif /* !libevent_global_shutdown */
+	close(fd4);
+	close(fd6);
 }
 
 void
@@ -337,7 +363,9 @@ main(int argc, char *argv[])
 		ui_cleanup = report_cleanup;
 	}
 	if (list == NULL) {
+		cleanup();
 		usage("no arguments");
+		/* NEVER REACHED */
 	}
 
 	/* Initial scheduling with increasing delay, distributes
@@ -358,8 +386,6 @@ main(int argc, char *argv[])
 	ui_init();
 	event_base_dispatch(ev_base);
 	ui_cleanup();
-
-	close(fd4);
-	close(fd6);
+	cleanup();
 	return 0;
 }

@@ -29,7 +29,9 @@ struct probe {
 	int		seqdelta;
 	int		seqlast;
 	int		early_mark;
+	struct event	*ev_read;
 	struct evbuffer	*evbuf;
+	void		*dnstask;
 	void		*owner;
 };
 
@@ -213,6 +215,14 @@ probe_setup(struct event_base *parent_event_base)
 	}
 }
 
+void probe_cleanup(void)
+{
+
+	regfree(&re_reply);
+	regfree(&re_other);
+	regfree(&re_xmiterr);
+}
+
 struct probe *
 probe_new(const char *line, void *owner)
 {
@@ -225,12 +235,13 @@ probe_new(const char *line, void *owner)
 		perror("malloc");
 		return (NULL);
 	}
+	prb->fd = -1;
 	prb->owner = owner;
 	strncat(prb->host, line, sizeof(prb->host) - 1);
 	prb->evbuf = evbuffer_new();
 	if (prb->evbuf == NULL) {
-		free(prb);
-		return (NULL);
+		probe_free(prb);
+		return NULL;
 	}
 
 	salen = sizeof(sa);
@@ -245,18 +256,32 @@ probe_new(const char *line, void *owner)
 		}
 		prb->resolved = 1;
 	} else {
-		if (dnstask_new(prb->host, resolved, prb) == NULL) {
-			free(prb);
+		prb->dnstask = dnstask_new(prb->host, resolved, prb);
+		if (prb->dnstask == NULL) {
+			probe_free(prb);
 			return NULL;
 		}
 	}
 	return (prb);
 }
 
+void probe_free(struct probe *prb)
+{
+
+	if (prb->fd >= 0)
+		close(prb->fd);
+	if (prb->ev_read)
+		event_free(prb->ev_read);
+	if (prb->dnstask)
+		dnstask_free(prb->dnstask);
+	if (prb->evbuf)
+		evbuffer_free(prb->evbuf);
+	free(prb);
+}
+
 void
 probe_send(struct probe *prb, int seq)
 {
-	struct event *ev;
 	int pair[2];
 	pid_t pid;
 
@@ -291,8 +316,12 @@ probe_send(struct probe *prb, int seq)
 	}
 	prb->seqdelta = seq - 1; /* linux ping(8) begins icmp_seq=1 */
 	evutil_make_socket_nonblocking(pair[0]);
-	ev = event_new(ev_base, pair[0], EV_READ|EV_PERSIST, readping, prb);
-	event_add(ev, NULL);
+	if (prb->fd >= 0)
+		close(prb->fd);
+	if (prb->ev_read != NULL)
+		event_free(prb->ev_read);
+	prb->ev_read = event_new(ev_base, pair[0], EV_READ|EV_PERSIST, readping, prb);
+	event_add(prb->ev_read, NULL);
 	switch (pid = fork()) {
 	case -1:
 		target_mark(prb->owner, seq, '!'); /* transmit error */

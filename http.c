@@ -31,6 +31,8 @@ struct probe {
 #ifdef WITH_SSL
 	SSL_CTX		*ssl_ctx;
 #endif /* WITH_SSL */
+	struct session	*sessions;
+	void		*dnstask;
 	void		*owner;
 };
 
@@ -43,6 +45,7 @@ struct session {
 #ifdef WITH_SSL
 	SSL		*ssl;
 #endif /* WITH_SSL */
+	struct session	*next;
 };
 
 static regex_t re_target;
@@ -57,6 +60,8 @@ static void session_readcb_drain(struct bufferevent *, void *);
 static void
 session_free(struct session *session)
 {
+
+	LL_DELETE(session->prb->sessions, session);
 	if (session->ev_timeout)
 		event_free(session->ev_timeout);
 	if (session->bev) {
@@ -248,6 +253,13 @@ probe_setup()
 #endif /* WITH_SSL */
 }
 
+void
+probe_cleanup(void)
+{
+
+	regfree(&re_target);
+}
+
 /*
  * Helper function to probe_add, will encode a nibble as hex.
  */
@@ -283,7 +295,6 @@ static const char uri_chars[256] = {
 	0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
 };
-
 
 /*
  * Allocate structure for a new target and parse source line into the
@@ -404,7 +415,8 @@ probe_new(const char *line, void *owner)
 			}
 			prb->resolved = 1;
 		} else {
-			if (dnstask_new(prb->host, resolved, prb) == NULL) {
+			prb->dnstask = dnstask_new(prb->host, resolved, prb);
+			if (prb->dnstask == NULL) {
 				free(prb);
 				return NULL;
 			}
@@ -412,6 +424,18 @@ probe_new(const char *line, void *owner)
 	}
 	sin(prb)->sin_port = htons(port);
 	return (prb);
+}
+
+void probe_free(struct probe *prb)
+{
+	struct session *s, *s_tmp;
+
+	LL_FOREACH_SAFE(prb->sessions, s, s_tmp) {
+		session_free(s);
+	}
+	if (prb->dnstask)
+		dnstask_free(prb->dnstask);
+	free(prb);
 }
 
 /*
@@ -478,4 +502,5 @@ void probe_send(struct probe *prb, int seq)
 		return;
 	}
 	event_add(session->ev_timeout, &tv_timeout);
+	LL_APPEND(prb->sessions, session);
 }

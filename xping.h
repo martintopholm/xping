@@ -65,7 +65,9 @@ void report_cleanup(void);
 
 /* from icmp.c */
 void probe_setup();
+void probe_cleanup();
 struct probe *probe_new(const char *, void *);
+void probe_free(struct probe *);
 void probe_send(struct probe *, int);
 
 /* from dnstask.c */
