@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -88,19 +89,33 @@ err:
 }
 
 static int
-has_10_dots(char *filename)
+regex(char *filename, const char *regex)
 {
 	char buf[4096];
 	int fd;
 	ssize_t n;
+	regex_t preg;
 
 	fd = open(filename, O_RDONLY);
-	n = read(fd, buf, sizeof(buf));
+	n = read(fd, buf, sizeof(buf) - 1);
 	close(fd);
 	if (n < 1)
 		return 0;
 	buf[n] = '\0';
-	if (strstr(buf, "..........") == NULL)
+
+	if (regcomp(&preg, regex, REG_EXTENDED | REG_NOSUB) != 0)
+		return -1;
+	if (regexec(&preg, buf, 0, NULL, 0) != 0)
+		return -1;
+	return 0;
+
+}
+
+static int
+has_10_dots(char *filename)
+{
+
+	if (regex(filename, "\\.{10}") < 0)
 		return 0;
 	return 1;
 }
