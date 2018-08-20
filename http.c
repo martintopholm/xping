@@ -41,6 +41,7 @@ struct session {
 	int		seq;
 	struct bufferevent *bev;
 	struct event	*ev_timeout;
+	char		*statusline;
 	int		completed;
 #ifdef WITH_SSL
 	SSL		*ssl;
@@ -61,6 +62,8 @@ static void
 session_free(struct session *session)
 {
 
+	if (session->statusline)
+		free(session->statusline);
 	LL_DELETE(session->prb->sessions, session);
 	if (session->ev_timeout)
 		event_free(session->ev_timeout);
@@ -114,6 +117,7 @@ session_readcb_status(struct bufferevent *bev, void *thunk)
 		} else
 			return; /* wait for more data */
 	}
+	session->statusline = line;
 	/* Parse response line */
 	protocol = strsep(&line, " ");
 	if (line == NULL) {
