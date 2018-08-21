@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -120,6 +121,15 @@ has_10_dots(char *filename)
 	return 1;
 }
 
+static int
+exists(char *filename)
+{
+	struct stat st;
+
+	if (stat(filename, &st) != 0)
+		return 0;
+	return 1;
+}
 
 static void
 test_xping_localhost(void *ctx_)
@@ -178,7 +188,11 @@ test_xping_http_localhost(void *ctx_)
 	snprintf(url, sizeof(url), "http://127.0.0.1:%hu", listen_port);
 
 	strcpy(ctx->name, "xping-http");
+	setenv("MALLOC_TRACE", "trace", 1);
+	setenv("LD_PRELOAD", "../mmtrace.so", 1);
 	pid = exec_wd(NULL, "../../xping-http", "-c", "10", url, NULL);
+	unsetenv("MALLOC_TRACE");
+	unsetenv("LD_PRELOAD");
 	tt_assert(pid > 0);
 	tt_assert(setsockopt(fd_srv, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
 	for (max_req = 10; max_req > 0; max_req--) {
@@ -195,6 +209,12 @@ test_xping_http_localhost(void *ctx_)
 	waitpid(pid, &wstatus, 0);
 	tt_assert(WEXITSTATUS(wstatus) == 0);
 	tt_assert(has_10_dots("stdout"));
+	if (exists("../mmtrace.so")) {
+		tt_assert_msg(exists("trace"), "mmtrace.so was built, but no trace produced");
+		pid = exec_wd(NULL, "mtrace", "../../xping-http", "trace", NULL);
+		waitpid(pid, &wstatus, 0);
+		tt_assert_msg(WEXITSTATUS(wstatus) == 0, "mtrace reported leaks");
+	}
 
 end:
 	;
