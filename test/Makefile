@@ -10,7 +10,8 @@ test: tinytest mmtrace.so
 	./tinytest || (find test.?????? -type f -print0 | xargs -0 head -50; exit 123)
 
 mmtrace.so: mmtrace.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -fPIC -shared -o $@ $^$>
+	$(CC) $(CFLAGS) $(LDFLAGS) -fPIC -shared -o $@ $^$> 2>/dev/null || \
+	    echo "The mcheck is unavailable, wont do leak detection."
 
 tinytest: check_blackbox.c tests.c tinytest.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^$>

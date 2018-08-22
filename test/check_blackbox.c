@@ -185,11 +185,13 @@ test_xping_http_localhost(void *ctx_)
 
 	listen_port = 0;
 	fd_srv = sock_listen(&listen_port);
+	tt_assert(fd_srv >= 0);
 	snprintf(url, sizeof(url), "http://127.0.0.1:%hu", listen_port);
 
 	strcpy(ctx->name, "xping-http");
 	setenv("MALLOC_TRACE", "trace", 1);
-	setenv("LD_PRELOAD", "../mmtrace.so", 1);
+	if (exists("../mmtrace.so"))
+		setenv("LD_PRELOAD", "../mmtrace.so", 1);
 	pid = exec_wd(NULL, "../../xping-http", "-c", "10", url, NULL);
 	unsetenv("MALLOC_TRACE");
 	unsetenv("LD_PRELOAD");
