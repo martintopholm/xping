@@ -20,6 +20,10 @@
 #include "tinytest.h"
 #include "tinytest_macros.h"
 
+
+#define BLACKBOX_OUTDIRS_MAX 3
+char blackbox_outdirs[3][16] = { {0}, {0}, {0} };
+
 struct context {
 	char		path[FILENAME_MAX];
 	char		name[FILENAME_MAX];
@@ -94,29 +98,33 @@ regex(char *filename, const char *regex)
 {
 	char buf[4096];
 	int fd;
-	ssize_t n;
+	ssize_t len;
 	regex_t preg;
+	int n;
 
 	fd = open(filename, O_RDONLY);
-	n = read(fd, buf, sizeof(buf) - 1);
+	len = read(fd, buf, sizeof(buf) - 1);
 	close(fd);
-	if (n < 1)
+	if (len < 1)
 		return 0;
-	buf[n] = '\0';
+	buf[len] = '\0';
 
 	if (regcomp(&preg, regex, REG_EXTENDED | REG_NOSUB) != 0)
 		return -1;
-	if (regexec(&preg, buf, 0, NULL, 0) != 0)
+	n = regexec(&preg, buf, 0, NULL, 0);
+	regfree(&preg);
+	if (n != 0)
 		return -1;
+	regfree(&preg);
 	return 0;
 
 }
 
 static int
-has_10_dots(char *filename)
+has_dots(char *filename)
 {
 
-	if (regex(filename, "\\.{10}") < 0)
+	if (regex(filename, "\\.{4}") < 0)
 		return 0;
 	return 1;
 }
@@ -139,11 +147,11 @@ test_xping_localhost(void *ctx_)
 	pid_t pid;
 
 	strcpy(ctx->name, "xping");
-	pid = exec_wd(NULL, "../../xping", "-c", "10", "127.0.0.1", NULL);
+	pid = exec_wd(NULL, "../../xping", "-c", "4", "127.0.0.1", NULL);
 	tt_uint_op(pid, >, 0);
 	waitpid(pid, &wstatus, 0);
 	tt_assert(WEXITSTATUS(wstatus) == 0);
-	tt_assert(has_10_dots("stdout"));
+	tt_assert(has_dots("stdout"));
 
 end:
 	;
@@ -157,11 +165,11 @@ test_xping_unpriv_localhost(void *ctx_)
 	pid_t pid;
 
 	strcpy(ctx->name, "xping-unpriv");
-	pid = exec_wd(NULL, "../../xping-unpriv", "-c", "10", "127.0.0.1", NULL);
+	pid = exec_wd(NULL, "../../xping-unpriv", "-c", "4", "127.0.0.1", NULL);
 	tt_uint_op(pid, >, 0);
 	waitpid(pid, &wstatus, 0);
 	tt_assert(WEXITSTATUS(wstatus) == 0);
-	tt_assert(has_10_dots("stdout"));
+	tt_assert(has_dots("stdout"));
 
 end:
 	;
@@ -183,6 +191,7 @@ test_xping_http_localhost(void *ctx_)
 	ssize_t n;
 	int max_req;
 
+	strcpy(blackbox_outdirs[2], ctx->path);
 	listen_port = 0;
 	fd_srv = sock_listen(&listen_port);
 	tt_assert(fd_srv >= 0);
@@ -192,12 +201,12 @@ test_xping_http_localhost(void *ctx_)
 	setenv("MALLOC_TRACE", "trace", 1);
 	if (exists("../mmtrace.so"))
 		setenv("LD_PRELOAD", "../mmtrace.so", 1);
-	pid = exec_wd(NULL, "../../xping-http", "-c", "10", url, NULL);
+	pid = exec_wd(NULL, "../../xping-http", "-c", "4", url, NULL);
 	unsetenv("MALLOC_TRACE");
 	unsetenv("LD_PRELOAD");
 	tt_assert(pid > 0);
 	tt_assert(setsockopt(fd_srv, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
-	for (max_req = 10; max_req > 0; max_req--) {
+	for (max_req = 4; max_req > 0; max_req--) {
 		fd = accept(fd_srv, NULL, 0);
 		if (fd < 0)
 			break;
@@ -210,12 +219,33 @@ test_xping_http_localhost(void *ctx_)
 	close(fd_srv);
 	waitpid(pid, &wstatus, 0);
 	tt_assert(WEXITSTATUS(wstatus) == 0);
-	tt_assert(has_10_dots("stdout"));
-	if (exists("../mmtrace.so")) {
-		tt_assert_msg(exists("trace"), "mmtrace.so was built, but no trace produced");
-		pid = exec_wd(NULL, "mtrace", "../../xping-http", "trace", NULL);
+	tt_assert(has_dots("stdout"));
+
+end:
+	;
+}
+
+static void
+test_memory_leakage(void *ctx_)
+{
+	char path[FILENAME_MAX];
+	int i;
+	pid_t pid;
+	int wstatus;
+
+	if (!exists("../mmtrace.so"))
+		tt_skip();
+	for (i=0; i<BLACKBOX_OUTDIRS_MAX; i++) {
+		if (blackbox_outdirs[i][0] == '\0')
+			continue;
+		snprintf(path, sizeof(path), "../%s/trace", blackbox_outdirs[i]);
+		if (!exists(path)) {
+			tt_fail_msg("mtrace output missing");
+			continue;
+		}
+		pid = exec_wd(NULL, "mtrace", "../../xping-http", path, NULL);
 		waitpid(pid, &wstatus, 0);
-		tt_assert_msg(WEXITSTATUS(wstatus) == 0, "mtrace reported leaks");
+		tt_want_msg(WEXITSTATUS(wstatus) == 0, "mtrace reported leaks");
 	}
 
 end:
@@ -269,5 +299,6 @@ struct testcase_t tc_blackbox[] = {
 	{"xping-unpriv-localhost", test_xping_unpriv_localhost,
 	    TT_OFF_BY_DEFAULT, &tc_setup},
 	{"xping-http-localhost", test_xping_http_localhost, 0, &tc_setup},
+	{"memory-leakage", test_memory_leakage, 0, &tc_setup},
 	END_OF_TESTCASES
 };
