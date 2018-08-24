@@ -7,7 +7,7 @@ PROFDATA=xping.profdata xping-unpriv.profdata xping-http.profdata
 test: tinytest mmtrace.so
 	test ! -O ../xping || sudo chown root ../xping
 	test -u ../xping || sudo chmod 4750 ../xping
-	./tinytest || (find test.?????? -type f -print0 | xargs -0 head -50; exit 123)
+	./tinytest || (find test.?????? -type f -name "std???" -print0 | xargs -0 head -50; exit 123)
 
 mmtrace.so: mmtrace.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -fPIC -shared -o $@ $^$> 2>/dev/null || \
