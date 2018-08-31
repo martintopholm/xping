@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -25,17 +26,23 @@
 char blackbox_outdirs[3][16] = { {0}, {0}, {0} };
 
 struct context {
-	char		path[FILENAME_MAX];
-	char		name[FILENAME_MAX];
+	const struct testcase_t	*testcase;
+	char			path[FILENAME_MAX];
+	char			name[FILENAME_MAX];
 };
 
+#define EXEC_MTRACE		0x01
+#define EXEC_FDSLIM_MASK	0xf0
+#define EXEC_FDSLIM_SHIFT	4
+
 static pid_t
-exec_wd(char *wd, char *file, ...)
+exec_wd(int flags, char *file, ...)
 {
 	va_list ap;
 	char *argv[128];
 	int i;
 	pid_t pid;
+	struct rlimit rlim;
 
 	va_start(ap, file);
 	argv[0] = file;
@@ -49,12 +56,17 @@ exec_wd(char *wd, char *file, ...)
 	case -1:
 		return -1;
 	case 0:
-		if (wd != NULL && chdir(wd) != 0) {
-			perror("chdir");
-			abort();
-		}
 		freopen("stdout", "w+", stdout);
 		freopen("stderr", "w+", stderr);
+		if (flags & EXEC_MTRACE) {
+			setenv("MALLOC_TRACE", "trace", 1);
+			setenv("LD_PRELOAD", "../mmtrace.so", 1);
+		}
+		if (flags & EXEC_FDSLIM_MASK) {
+			rlim.rlim_cur = rlim.rlim_max = (flags & EXEC_FDSLIM_MASK) >> EXEC_FDSLIM_SHIFT;
+			if (setrlimit(RLIMIT_NOFILE, &rlim) < 0)
+				abort();
+		}
 		execvp(file, argv);
 		perror("execvp");
 		abort();
@@ -147,7 +159,7 @@ test_xping_localhost(void *ctx_)
 	pid_t pid;
 
 	strcpy(ctx->name, "xping");
-	pid = exec_wd(NULL, "../../xping", "-c", "4", "127.0.0.1", NULL);
+	pid = exec_wd(0, "../../xping", "-c", "4", "127.0.0.1", NULL);
 	tt_uint_op(pid, >, 0);
 	waitpid(pid, &wstatus, 0);
 	tt_assert(WEXITSTATUS(wstatus) == 0);
@@ -165,7 +177,7 @@ test_xping_unpriv_localhost(void *ctx_)
 	pid_t pid;
 
 	strcpy(ctx->name, "xping-unpriv");
-	pid = exec_wd(NULL, "../../xping-unpriv", "-c", "4", "127.0.0.1", NULL);
+	pid = exec_wd(0, "../../xping-unpriv", "-c", "4", "127.0.0.1", NULL);
 	tt_uint_op(pid, >, 0);
 	waitpid(pid, &wstatus, 0);
 	tt_assert(WEXITSTATUS(wstatus) == 0);
@@ -183,13 +195,14 @@ test_xping_http_localhost(void *ctx_)
 	char buf[4096];
 	char response[] = "HTTP/1.0 200 OK\r\n\r\n";
 	unsigned short listen_port;
-	struct timeval tv = {15, 0};
+	struct timeval tv = {2, 0};
 	int wstatus;
 	pid_t pid;
 	int fd_srv;
 	int fd;
 	ssize_t n;
 	int max_req;
+	int exec_flags;
 
 	strcpy(blackbox_outdirs[2], ctx->path);
 	listen_port = 0;
@@ -198,12 +211,12 @@ test_xping_http_localhost(void *ctx_)
 	snprintf(url, sizeof(url), "http://127.0.0.1:%hu", listen_port);
 
 	strcpy(ctx->name, "xping-http");
-	setenv("MALLOC_TRACE", "trace", 1);
+	exec_flags = 0;
+	if (strcmp(ctx->testcase->name, "fd-leakage-http") == 0)
+		exec_flags |= 10 << EXEC_FDSLIM_SHIFT;
 	if (exists("../mmtrace.so"))
-		setenv("LD_PRELOAD", "../mmtrace.so", 1);
-	pid = exec_wd(NULL, "../../xping-http", "-c", "4", url, NULL);
-	unsetenv("MALLOC_TRACE");
-	unsetenv("LD_PRELOAD");
+		exec_flags |= EXEC_MTRACE;
+	pid = exec_wd(exec_flags, "../../xping-http", "-c", "4", url, NULL);
 	tt_assert(pid > 0);
 	tt_assert(setsockopt(fd_srv, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
 	for (max_req = 4; max_req > 0; max_req--) {
@@ -243,7 +256,7 @@ test_memory_leakage(void *ctx_)
 			tt_fail_msg("mtrace output missing");
 			continue;
 		}
-		pid = exec_wd(NULL, "mtrace", "../../xping-http", path, NULL);
+		pid = exec_wd(0, "mtrace", "../../xping-http", path, NULL);
 		waitpid(pid, &wstatus, 0);
 		tt_want_msg(WEXITSTATUS(wstatus) == 0, "mtrace reported leaks");
 	}
@@ -278,6 +291,7 @@ setup(const struct testcase_t *testcase)
 	ctx = calloc(1, sizeof(*ctx));
 	if (ctx == NULL)
 		return NULL;
+	ctx->testcase = testcase;
 	strcpy(buf, "test.XXXXXX");
 	if (mkdtemp(buf) == NULL)
 		goto err;
@@ -299,6 +313,7 @@ struct testcase_t tc_blackbox[] = {
 	{"xping-unpriv-localhost", test_xping_unpriv_localhost,
 	    TT_OFF_BY_DEFAULT, &tc_setup},
 	{"xping-http-localhost", test_xping_http_localhost, 0, &tc_setup},
+	{"fd-leakage-http", test_xping_http_localhost, 0, &tc_setup},
 	{"memory-leakage", test_memory_leakage, 0, &tc_setup},
 	END_OF_TESTCASES
 };
