@@ -17,6 +17,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <event2/event.h>
 
 #include "tinytest.h"
 #include "tinytest_macros.h"
@@ -246,7 +247,7 @@ test_memory_leakage(void *ctx_)
 	pid_t pid;
 	int wstatus;
 
-	if (!exists("../mmtrace.so"))
+	if (!exists("../mmtrace.so") || LIBEVENT_VERSION_NUMBER < 0x02010001 )
 		tt_skip();
 	for (i=0; i<BLACKBOX_OUTDIRS_MAX; i++) {
 		if (blackbox_outdirs[i][0] == '\0')
