@@ -21,16 +21,8 @@ Binary packages
 Prebuilt amd64 binary packages for Debian and Arch Linux are available
 from http://martin.topholm.eu/pub/xping .
 
-To use as an `apt(8)` repository:
-
-    printf "\ndeb http://martin.topholm.eu/pub/xping/debian /\n" >> /etc/apt/sources.list
-    curl -# http://martin.topholm.eu/082a0808.asc | apt-key add -
-
-To use as a `pacman(8)` repository
-
-    printf "\n[xping]\nServer = http://martin.topholm.eu/pub/xping/archlinux\n" >> /etc/pacman.conf
-    curl -# http://martin.topholm.eu/082a0808.asc | pacman-key --add - && \
-        pacman-key --lsign-key BCEBFB5B082A0808
+Previously APT and pacman repositories were maintained as well, but
+these are now deprecated.
 
 
 Building
@@ -57,6 +49,11 @@ when it has opened the sockets.
 
 Changes
 -------
+
+v1.4.1
+
+  * fix resource leaks in http module
+  * fix stalled http transfers
 
 v1.4.0
 
