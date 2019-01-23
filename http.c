@@ -462,12 +462,13 @@ void probe_send(struct probe *prb, int seq)
 	}
 	session->prb = prb;
 	session->seq = seq;
+	LL_APPEND(prb->sessions, session);
 #ifdef WITH_SSL
 	if (prb->ssl_ctx != NULL) {
 		session->ssl = SSL_new(prb->ssl_ctx);
 		if (session->ssl == NULL) {
 			target_mark(prb->owner, seq, '!');
-			free(session);
+			session_free(session);
 			return;
 		}
 		session->bev = bufferevent_openssl_socket_new(ev_base, -1,
@@ -483,7 +484,7 @@ void probe_send(struct probe *prb, int seq)
 #endif
 	if (session->bev == NULL) {
 		target_mark(prb->owner, seq, '!');
-		free(session);
+		session_free(session);
 		return;
 	}
 	bufferevent_setcb(session->bev, session_readcb_status, NULL,
@@ -506,5 +507,4 @@ void probe_send(struct probe *prb, int seq)
 		return;
 	}
 	event_add(session->ev_timeout, &tv_timeout);
-	LL_APPEND(prb->sessions, session);
 }
