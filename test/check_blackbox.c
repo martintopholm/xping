@@ -33,6 +33,7 @@ struct context {
 };
 
 #define EXEC_MTRACE		0x01
+#define EXEC_UNREACH		0x02
 #define EXEC_FDSLIM_MASK	0xf0
 #define EXEC_FDSLIM_SHIFT	4
 
@@ -45,6 +46,8 @@ exec_wd(int flags, char *file, ...)
 	pid_t pid;
 	struct rlimit rlim;
 
+	if (flags & EXEC_MTRACE && flags & EXEC_UNREACH)
+		return 1;
 	va_start(ap, file);
 	argv[0] = file;
 	for (i = 1; i < sizeof(argv)/sizeof(char *); i ++) {
@@ -62,6 +65,9 @@ exec_wd(int flags, char *file, ...)
 		if (flags & EXEC_MTRACE) {
 			setenv("MALLOC_TRACE", "trace", 1);
 			setenv("LD_PRELOAD", "../mmtrace.so", 1);
+		}
+		if (flags & EXEC_UNREACH) {
+			setenv("LD_PRELOAD", "../unreach.so", 1);
 		}
 		if (flags & EXEC_FDSLIM_MASK) {
 			rlim.rlim_cur = rlim.rlim_max = (flags & EXEC_FDSLIM_MASK) >> EXEC_FDSLIM_SHIFT;
@@ -118,8 +124,8 @@ regex(char *filename, const char *regex)
 	fd = open(filename, O_RDONLY);
 	len = read(fd, buf, sizeof(buf) - 1);
 	close(fd);
-	if (len < 1)
-		return 0;
+	if (len < 0)
+		return -1;
 	buf[len] = '\0';
 
 	if (regcomp(&preg, regex, REG_EXTENDED | REG_NOSUB) != 0)
@@ -163,6 +169,7 @@ test_xping_localhost(void *ctx_)
 	pid = exec_wd(0, "../../xping", "-c", "4", "127.0.0.1", NULL);
 	tt_uint_op(pid, >, 0);
 	waitpid(pid, &wstatus, 0);
+	tt_assert(WIFEXITED(wstatus));
 	tt_assert(WEXITSTATUS(wstatus) == 0);
 	tt_assert(has_dots("stdout"));
 
@@ -205,7 +212,6 @@ test_xping_http_localhost(void *ctx_)
 	int max_req;
 	int exec_flags;
 
-	strcpy(blackbox_outdirs[2], ctx->path);
 	listen_port = 0;
 	fd_srv = sock_listen(&listen_port);
 	tt_assert(fd_srv >= 0);
@@ -213,10 +219,17 @@ test_xping_http_localhost(void *ctx_)
 
 	strcpy(ctx->name, "xping-http");
 	exec_flags = 0;
-	if (strcmp(ctx->testcase->name, "fd-leakage-http") == 0)
+	if (strcmp(ctx->testcase->name, "xping-http-localhost") == 0) {
+		strcpy(blackbox_outdirs[2], ctx->path);
+		if (exists("../mmtrace.so"))
+			exec_flags |= EXEC_MTRACE;
+	} else if (strcmp(ctx->testcase->name, "connect-unreach-http") == 0) {
+		if (!exists("../unreach.so"))
+			tt_skip();
+		exec_flags |= EXEC_UNREACH;
+	} else if (strcmp(ctx->testcase->name, "fd-leakage-http") == 0) {
 		exec_flags |= 10 << EXEC_FDSLIM_SHIFT;
-	if (exists("../mmtrace.so"))
-		exec_flags |= EXEC_MTRACE;
+	}
 	pid = exec_wd(exec_flags, "../../xping-http", "-c", "4", url, NULL);
 	tt_assert(pid > 0);
 	tt_assert(setsockopt(fd_srv, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
@@ -230,12 +243,16 @@ test_xping_http_localhost(void *ctx_)
 		write(fd, response, strlen(response));
 		close(fd);
 	}
-	close(fd_srv);
 	waitpid(pid, &wstatus, 0);
+	tt_assert(WIFEXITED(wstatus));
 	tt_assert(WEXITSTATUS(wstatus) == 0);
-	tt_assert(has_dots("stdout"));
+	if (strcmp(ctx->testcase->name, "connect-unreach-http") == 0)
+		tt_assert(regex("stdout", "[!#]{4}") == 0)
+	else
+		tt_assert(has_dots("stdout"));
 
 end:
+	close(fd_srv);
 	;
 }
 
@@ -273,7 +290,7 @@ cleanup(const struct testcase_t *testcase, void *ctx_)
 	struct context *ctx = ctx_;
 	char buf[FILENAME_MAX];
 
-	snprintf(buf, sizeof(buf), "%s.profraw", ctx->name);
+	snprintf(buf, sizeof(buf), "%.128s.profraw", ctx->name);
 	rename("default.profraw", buf);
 	if (ctx->path[0])
 		if (chdir("..") < 0)
@@ -315,6 +332,7 @@ struct testcase_t tc_blackbox[] = {
 	    TT_OFF_BY_DEFAULT, &tc_setup},
 	{"xping-http-localhost", test_xping_http_localhost, 0, &tc_setup},
 	{"fd-leakage-http", test_xping_http_localhost, 0, &tc_setup},
+	{"connect-unreach-http", test_xping_http_localhost, 0, &tc_setup},
 	{"memory-leakage", test_memory_leakage, 0, &tc_setup},
 	END_OF_TESTCASES
 };

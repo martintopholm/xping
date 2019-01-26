@@ -4,10 +4,13 @@ PROFDATA=xping.profdata xping-unpriv.profdata xping-http.profdata
 
 .PHONY: all test $(PROFDATA) coverage clean
 
-test: tinytest mmtrace.so
+test: tinytest mmtrace.so unreach.so
 	test ! -O ../xping || sudo chown root ../xping
 	test -u ../xping || sudo chmod 4750 ../xping
 	./tinytest || (find test.?????? -type f -name "std???" -print0 | xargs -0 head -50; exit 123)
+
+unreach.so: unreach.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -fPIC -shared -o $@ $^$>
 
 mmtrace.so: mmtrace.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -fPIC -shared -o $@ $^$> 2>/dev/null || \
@@ -31,4 +34,4 @@ coverage: $(PROFDATA)
 
 clean:
 	rm -rf test.??????
-	rm -f tinytest mmtrace.so *.profdata
+	rm -f tinytest mmtrace.so unreach.so *.profdata
