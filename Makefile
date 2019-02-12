@@ -14,7 +14,7 @@ COVFLAGS=-fprofile-instr-generate -fcoverage-mapping
 DEPS+=check-libevent.c
 OBJS+=termio.o report.o version.o dnstask.o
 LIBS+=-levent
-VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.4.1`"
+VERSION="`git describe --tags --always --dirty=+ 2>/dev/null || echo v1.4.2`"
 
 # Link with ncurses
 #DEPS+=check-curses.c

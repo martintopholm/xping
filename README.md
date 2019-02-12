@@ -50,6 +50,10 @@ when it has opened the sockets.
 Changes
 -------
 
+v1.4.2
+
+  * fix segfault in http module
+
 v1.4.1
 
   * fix resource leaks in http module
