@@ -212,9 +212,7 @@ cleanup(void)
 	probe_cleanup();
 	evdns_base_free(dns, 0);
 	event_base_free(ev_base);
-#ifdef libevent_global_shutdown
 	libevent_global_shutdown();
-#endif /* !libevent_global_shutdown */
 	close(fd4);
 	close(fd6);
 }
