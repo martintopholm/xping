@@ -36,6 +36,51 @@ struct context {
 #define EXEC_FDSLIM_MASK	0xf0
 #define EXEC_FDSLIM_SHIFT	4
 
+/*
+ * Sets the fileno resource limit to the lowest possible plus some headroom.
+ * forking and doing xping-http apparently needs 7 descriptors, so headroom
+ * needs to be about 8 for xping-http to work.
+ */
+static int
+shrink_fdlimit(int start, int headroom)
+{
+	struct rlimit rlim;
+	int fd;
+	int limit;
+
+	for (limit = start; ; limit--) {
+		rlim.rlim_cur = limit;
+		rlim.rlim_max = start;
+		if (setrlimit(RLIMIT_NOFILE, &rlim) < 0)
+			return -1;
+		fprintf(stderr, "limit: %d\n", limit);
+		fd = open("stdout", O_RDONLY);
+		if (fd < 0) {
+			fprintf(stderr, "fd < 0 errno=%d (%d==EMFILE)\n", errno, EMFILE);
+			if ( errno == EMFILE)
+				break;
+			return -1;
+		}
+		close(fd);
+	}
+
+	fprintf(stdout, "limit is now being set to: %d\n", limit + headroom);
+	fflush(stdout);
+	fflush(stderr);
+	rlim.rlim_cur = limit + headroom;
+	rlim.rlim_max = limit + headroom;
+	if (setrlimit(RLIMIT_NOFILE, &rlim) < 0)
+		return -1;
+	return 0;
+}
+
+/*
+ * Execute xping tool and log output adjust the execution environment according
+ * to flags:
+ * - EXEC_MTRACE enable memcheck using mmtrace.so in LD_PRELOAD
+ * - EXEC_UNREACH to hack the tcp connect call to return unreachable.
+ * - EXEC_FDSLIM_MASK to limit the available file descriptors.
+ */
 static pid_t
 exec_wd(int flags, char *file, ...)
 {
@@ -43,7 +88,6 @@ exec_wd(int flags, char *file, ...)
 	char *argv[128];
 	int i;
 	pid_t pid;
-	struct rlimit rlim;
 
 	if (flags & EXEC_MTRACE && flags & EXEC_UNREACH)
 		return 1;
@@ -69,8 +113,7 @@ exec_wd(int flags, char *file, ...)
 			setenv("LD_PRELOAD", "../unreach.so", 1);
 		}
 		if (flags & EXEC_FDSLIM_MASK) {
-			rlim.rlim_cur = rlim.rlim_max = (flags & EXEC_FDSLIM_MASK) >> EXEC_FDSLIM_SHIFT;
-			if (setrlimit(RLIMIT_NOFILE, &rlim) < 0)
+			if (shrink_fdlimit(32, (flags & EXEC_FDSLIM_MASK) >> EXEC_FDSLIM_SHIFT) < 0)
 				abort();
 		}
 		execvp(file, argv);
@@ -81,6 +124,9 @@ exec_wd(int flags, char *file, ...)
 	}
 }
 
+/*
+ * Opens a tcp listen socket on ipv4 localhost and given port.
+ */
 static int
 sock_listen(unsigned short *port)
 {
@@ -111,6 +157,9 @@ err:
 	return -1;
 }
 
+/*
+ * Check for for the existing of a string matching given regex.
+ */
 static int
 regex(char *filename, const char *regex)
 {
@@ -138,6 +187,9 @@ regex(char *filename, const char *regex)
 
 }
 
+/*
+ * Check for four dots in given file (the xping test success indicator).
+ */
 static int
 has_dots(char *filename)
 {
@@ -227,7 +279,7 @@ test_xping_http_localhost(void *ctx_)
 			tt_skip();
 		exec_flags |= EXEC_UNREACH;
 	} else if (strcmp(ctx->testcase->name, "fd-leakage-http") == 0) {
-		exec_flags |= 10 << EXEC_FDSLIM_SHIFT;
+		exec_flags |= 8 << EXEC_FDSLIM_SHIFT;
 	}
 	pid = exec_wd(exec_flags, "../../xping-http", "-c", "4", url, NULL);
 	tt_assert(pid > 0);
