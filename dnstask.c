@@ -107,6 +107,13 @@ static void
 sendquery(int fd, short what, void *thunk)
 {
 	struct dnstask *task = thunk;
+
+	/* DNS resolving not initialized. Reschedule dummy event. */
+	if (!dns) {
+		reschedule(task->ev_resolve, 60);
+		task->cb(0, NULL, task->thunk);
+		return;
+	}
 	if (!v4_flag) {
 		evdns_base_resolve_ipv6(dns, task->host, 0,
 		    response_ipv6, task);
