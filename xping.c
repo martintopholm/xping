@@ -210,7 +210,9 @@ cleanup(void)
 		free(t);
 	}
 	probe_cleanup();
-	evdns_base_free(dns, 0);
+	if (dns) {
+		evdns_base_free(dns, 0);
+	}
 	event_base_free(ev_base);
 	libevent_global_shutdown();
 	close(fd4);
@@ -245,7 +247,7 @@ main(int argc, char *argv[])
 	char *end;
 	int i;
 	int len;
-	char ch;
+	int ch;
 
 #ifdef DO_SOCK_RAW
 	/* Open RAW-socket and drop root-privs */
