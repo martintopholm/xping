@@ -107,7 +107,7 @@ exec_wd(int flags, char *file, ...)
 		freopen("stderr", "w+", stderr);
 		if (flags & EXEC_MTRACE) {
 			setenv("MALLOC_TRACE", "trace", 1);
-			setenv("LD_PRELOAD", "../mmtrace.so", 1);
+			setenv("LD_PRELOAD", "../mmtrace.so libc_malloc_debug.so", 1);
 		}
 		if (flags & EXEC_UNREACH) {
 			setenv("LD_PRELOAD", "../unreach.so", 1);
