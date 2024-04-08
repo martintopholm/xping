@@ -345,7 +345,7 @@ main(int argc, char *argv[])
 			if ((end = strchr(buf, '#')) != NULL)
 				*end = '\0';
 			for (len = strlen(buf) - 1; len > 0; len--) {
-				if (strchr(" \t\n", buf[len]) == NULL)
+				if (strchr(" \t\r\n", buf[len]) == NULL)
 					break;
 				buf[len] = '\0';
 			}
