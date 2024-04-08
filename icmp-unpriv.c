@@ -189,7 +189,7 @@ resolved(int af, void *address, void *thunk)
  *     From 192.0.2.1 icmp_seq=1 Destination Net Unreachable
  */
 void
-probe_setup(struct event_base *parent_event_base)
+probe_setup(void)
 {
 	signal(SIGCHLD, SIG_IGN);
 	if (regcomp(&re_reply,

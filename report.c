@@ -15,7 +15,7 @@
 
 extern int w_width;
 
-void report_init()
+void report_init(void)
 {
 }
 
@@ -23,7 +23,7 @@ void report_update(struct target *t)
 {
 }
 
-void report_cleanup()
+void report_cleanup(void)
 {
 	struct target *t;
 	int i, imax, ifirst, ilast;

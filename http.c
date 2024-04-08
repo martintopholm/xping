@@ -241,7 +241,7 @@ resolved(int af, void *address, void *thunk)
 #define RE_URL 7
 #define RE_MAX 8
 void
-probe_setup()
+probe_setup(void)
 {
 	tv_timeout.tv_sec = 3 * i_interval / 1000;
 	tv_timeout.tv_usec = 3 * i_interval % 1000 * 1000;
