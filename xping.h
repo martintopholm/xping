@@ -64,8 +64,8 @@ void report_update(struct target *);
 void report_cleanup(void);
 
 /* from icmp.c */
-void probe_setup();
-void probe_cleanup();
+void probe_setup(void);
+void probe_cleanup(void);
 struct probe *probe_new(const char *, void *);
 void probe_free(struct probe *);
 void probe_send(struct probe *, int);
