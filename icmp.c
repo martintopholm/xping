@@ -376,7 +376,7 @@ resolved(int af, void *address, void *thunk)
  * Prepare datastructures and events needed for probe
  */
 void
-probe_setup()
+probe_setup(void)
 {
 	int i;
 
@@ -407,7 +407,7 @@ probe_setup()
 }
 
 void
-probe_cleanup()
+probe_cleanup(void)
 {
 
 	HASH_CLEAR(hh, hash);

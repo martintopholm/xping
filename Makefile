@@ -45,7 +45,7 @@ check-libevent.c:
 	@/bin/echo -n 'Checking for libevent... '; \
 	 (echo '#include <stdio.h>'; \
 	  echo '#include <event2/event.h>'; \
-	  echo 'int main()'; \
+	  echo 'int main(void)'; \
 	  echo '{ printf("%s\\n", event_get_version()); return 0; }' \
 	 ) | $(CC) $(CFLAGS) $(LDFLAGS) -x c -o /dev/null - -levent >/dev/null 2>/dev/null && echo yes || \
 	 (echo no; \
@@ -59,7 +59,7 @@ check-curses.c:
 	@/bin/echo -n 'Checking for libcurses... '; \
 	 (echo '#include <stdio.h>'; \
 	  echo '#include <curses.h>'; \
-	  echo 'int main()'; \
+	  echo 'int main(void)'; \
 	  echo '{ initscr(); return 0; }' \
 	 ) | $(CC) $(CFLAGS) -x c -o /dev/null - -lcurses >/dev/null 2>/dev/null && echo yes || \
 	 (echo no; \
@@ -73,7 +73,7 @@ check-openssl.c:
 	@/bin/echo -n 'Checking for openssl... '; \
 	 (echo '#include <stdio.h>'; \
 	  echo '#include <openssl/ssl.h>'; \
-	  echo 'int main()'; \
+	  echo 'int main(void)'; \
 	  echo '{ printf("%d\\n", SSL_library_init()); return 0; }' \
 	 ) | $(CC) $(CFLAGS) $(LDFLAGS) -x c -o /dev/null - -lssl >/dev/null 2>/dev/null && echo yes || \
 	 (echo no; \
